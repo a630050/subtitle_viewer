@@ -12,7 +12,8 @@
         .main-container { display: flex; width: 100%; height: 100%; }
 
         /* Left Pane: Editor + Sidebar */
-        .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 1em; overflow: hidden; }
+        .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 0.5em; overflow: hidden; }
+        .editor-pane h3 { font-size: 1.5em; margin: 0; }
         .editor-area { display: flex; flex-direction: row; flex-grow: 1; gap: 1em; position: relative; align-items: stretch; }
         
         /* Collapsible Bookmark Sidebar */
@@ -105,11 +106,18 @@
 			align-items: center;       /* 垂直居中 */
 		}
         .bookmark-dot { position: absolute; left: 8px; /* Adjusted position */ top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background-color: #3498db; border-radius: 50%; }
-                .highlight { 
-							background-color: #ffc107 !important; 
-							color: #000 !important; 
-							font-weight: bold; 
-							}
+        
+        /* ★ 新增：高亮樣式 */
+        .highlight-active {
+            background-color: #ffc107 !important; /* 橘色 */
+            color: #000 !important; 
+            font-weight: bold; 
+        }
+        .highlight-blank {
+            background-color: #cccccc !important; /* 灰色 */
+            color: #000 !important; 
+            font-weight: bold; 
+        }
         
         #script-editor {
             position: absolute;
@@ -139,7 +147,7 @@
         #current-subtitle p { margin: 0; }
 
                 .config-buttons button { width: 100%; padding: 8px; font-size: 14px; cursor: pointer; }
-        .file-buttons button { padding: 8px; font-size: 14px; cursor: pointer; flex: 1; white-space: nowrap; }
+        .file-buttons button { padding: 4px 8px; font-size: 14px; cursor: pointer; flex: 1; white-space: nowrap; }
         .file-buttons, .config-buttons { display: flex; gap: 10px; }
         .style-control { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .style-control label { flex-basis: 40%; }
@@ -324,7 +332,6 @@
                   importCancelBtn = document.getElementById('import-cancel-btn'),
                   bookmarkSidebar = document.getElementById('bookmark-sidebar'),
                   sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'),
-                  // ★ 新增以下變數
                   viewerLinkAnchor = document.getElementById('viewer-link-anchor'),
                   qrcodeBtn = document.getElementById('qrcode-btn'),
                   qrcodeModal = document.getElementById('qrcode-modal'),
@@ -337,6 +344,9 @@
             let importedFileContent = '';
             let heartbeatInterval;
             let lastPongTime = Date.now();
+            
+            let currentSentenceLineDiv = null; 
+            let isBlanked = false; 
 
             socket.on('connect', () => { 
                 statusDiv.textContent = '已連線 ✅'; 
@@ -359,16 +369,14 @@
             });
 
             function startHeartbeat() {
-                stopHeartbeat(); // 清除任何現有的心跳
+                stopHeartbeat();
                 heartbeatInterval = setInterval(() => {
                     const now = Date.now();
                     socket.emit('ping', { room: ROOM_ID, timestamp: now });
-                    
-                    // 檢查是否超過 10 秒沒收到 pong
                     if (now - lastPongTime > 10000) {
                         statusDiv.textContent = '連線異常 ⚠️';
                     }
-                }, 60000); // 每 60 秒發送一次心跳
+                }, 60000);
             }
 
             function stopHeartbeat() {
@@ -384,11 +392,9 @@
                     const originalPaddingBottom = '10px';
                     lineNumbersDiv.style.paddingRight = originalPaddingRight;
                     lineNumbersDiv.style.paddingBottom = originalPaddingBottom;
-
                     const scrollbarWidth = editor.offsetWidth - editor.clientWidth;
                     const scrollbarHeight = editor.offsetHeight - editor.clientHeight;
-
-                    if (scrollbarWidth > 1) { /* Allow for rounding errors */
+                    if (scrollbarWidth > 1) {
                         lineNumbersDiv.style.paddingRight = `${parseInt(originalPaddingRight) + scrollbarWidth}px`;
                     }
                     if (scrollbarHeight > 1) {
@@ -406,14 +412,13 @@
                 
                 const currentLine = localState.lines[localState.current_index] || '';
                 const cleanLine = cleanLineForDisplay(currentLine);
-                currentSubtitleDiv.innerHTML = cleanLine.replace(/\n/g, '<br>');
+                currentSubtitleDiv.innerHTML = isBlanked ? '' : cleanLine.replace(/\n/g, '<br>');
 
                 updateBookmarksList();
                 updateLineNumbers();
                 updateStyles();
                 if (indexChanged) adjustScroll();
                 
-                // ★ 修改此處邏輯
                 const viewerUrl = `${window.location.origin}/viewer/${ROOM_ID}`;
                 viewerLinkAnchor.href = viewerUrl;
                 viewerLinkAnchor.textContent = viewerUrl;
@@ -454,7 +459,10 @@
                     li.textContent = `${parseInt(index) + 1}: ${bookmarkText}`;
                     li.title = bookmarkText;
                     li.dataset.index = index;
-                    li.addEventListener('click', () => socket.emit('update_index', { room: ROOM_ID, index: parseInt(index) }));
+                    li.addEventListener('click', () => {
+                        isBlanked = false; 
+                        socket.emit('update_index', { room: ROOM_ID, index: parseInt(index) });
+                    });
                     bookmarksList.appendChild(li);
                 }
             }
@@ -463,11 +471,8 @@
 				const lines = editor.value.split('\n');
 				const lineCount = lines.length;
 				const digits = String(lineCount).length;
-
-				// 寬度計算公式保持不變，它已經是正確的
 				const newWidth = 50 + (digits * 8) + 5;
 
-				// 應用統一寬度
 				if (parseInt(lineNumbersDiv.style.width) !== newWidth) {
 					lineNumbersDiv.style.width = `${newWidth}px`;
 					const newLeft = `${newWidth}px`;
@@ -476,20 +481,24 @@
 					editor.style.width = newEditorWidth;
 				}
 
+                if (currentSentenceLineDiv) {
+                    currentSentenceLineDiv.classList.remove('highlight-active', 'highlight-blank');
+                }
+
 				lineNumbersDiv.innerHTML = '';
 				lines.forEach((line, index) => {
 					const lineDiv = document.createElement('div');
-
-					// --- ★★★ 核心結構性修改 ★★★ ---
-					// 1. 創建一個專門放數字的 <span>
 					const numberSpan = document.createElement('span');
 					numberSpan.textContent = index + 1;
-					// 2. 將這個 <span> 加入到行 div 中
 					lineDiv.appendChild(numberSpan);
-					// --- ★★★ 修改結束 ★★★ ---
 
 					if (index === localState.current_index) {
-						lineDiv.classList.add('highlight');
+                        if (isBlanked) {
+						    lineDiv.classList.add('highlight-blank');
+                        } else {
+						    lineDiv.classList.add('highlight-active');
+                        }
+                        currentSentenceLineDiv = lineDiv;
 					}
 					
 					if (localState.bookmarks[index] !== undefined) {
@@ -498,7 +507,14 @@
 						lineDiv.appendChild(dot);
 					}
 					
-					lineDiv.addEventListener('click', () => toggleBookmark(index));
+                    lineDiv.addEventListener('click', () => {
+                        isBlanked = false; 
+                        socket.emit('update_index', { room: ROOM_ID, index: index });
+                    });
+                    lineDiv.addEventListener('dblclick', () => {
+                        toggleBookmark(index);
+                    });
+
 					lineNumbersDiv.appendChild(lineDiv);
 				});
 				
@@ -521,11 +537,7 @@
                 }
                 const newText = lines.join('\n');
                 editor.value = newText;
-                
-                // Immediately update UI locally to feel responsive
                 updateLineNumbers();
-
-                // Then, send the update to the server
                 socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
             }
 
@@ -534,19 +546,14 @@
                     const lineHeight = parseFloat(window.getComputedStyle(editor).lineHeight);
                     if (!lineHeight) return;
                     const editorHeight = editor.clientHeight;
-                    const linesInView = Math.floor(editorHeight / lineHeight);
-                    const currentIndex = localState.current_index;
-                    const scrollTop = editor.scrollTop;
                     const comfortZone = 3;
-                    const comfortTopBoundary = scrollTop + (comfortZone * lineHeight);
-                    const comfortBottomBoundary = scrollTop + editorHeight - ((comfortZone + 1) * lineHeight);
-                    const currentLineY = currentIndex * lineHeight;
-                    if (currentLineY > comfortBottomBoundary) {
-                        const newScrollTop = (currentIndex - comfortZone) * lineHeight;
-                        editor.scrollTop = newScrollTop;
-                    } else if (currentLineY < comfortTopBoundary) {
-                        const newScrollTop = (currentIndex + comfortZone + 1 - linesInView) * lineHeight;
-                        editor.scrollTop = Math.max(0, newScrollTop);
+                    const currentLineY = localState.current_index * lineHeight;
+                    const comfortTopBoundary = editor.scrollTop + (comfortZone * lineHeight);
+                    const comfortBottomBoundary = editor.scrollTop + editorHeight - ((comfortZone + 1) * lineHeight);
+                    
+                    if (currentLineY < comfortTopBoundary || currentLineY > comfortBottomBoundary) {
+                        const targetScrollTop = currentLineY - (editorHeight / 2) + lineHeight;
+                        editor.scrollTop = Math.max(0, targetScrollTop);
                     }
                 } catch (e) {
                     console.error("Error adjusting scroll:", e);
@@ -562,7 +569,7 @@
                 const lines = text.split('\n');
                 const newLines = [];
                 const MAX_LEN = 20;
-                const punctuation = /([,.\uff0c\u3002\u3001?!;:\s])/; 
+                const punctuation = /([,\.\uff0c\u3002\u3001?!;:\s])/; 
                 for (const line of lines) {
                     const trimmedLine = line.trim();
                     if (trimmedLine === '') continue;
@@ -675,12 +682,8 @@
                 };
                 socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
             }
-            fontSizeInput.addEventListener('input', handleStyleChange);
-            fgColorInput.addEventListener('input', handleStyleChange);
-            bgColorInput.addEventListener('input', handleStyleChange);
-            fontFamilySelect.addEventListener('change', handleStyleChange);
-            textAlignSelect.addEventListener('change', handleStyleChange);
-            marginInput.addEventListener('input', handleStyleChange);
+            [fontSizeInput, fgColorInput, bgColorInput, marginInput].forEach(el => el.addEventListener('input', handleStyleChange));
+            [fontFamilySelect, textAlignSelect].forEach(el => el.addEventListener('change', handleStyleChange));
 
             editor.addEventListener('input', () => {
                 clearTimeout(editorUpdateTimeout);
@@ -691,15 +694,12 @@
             });
 
             editor.addEventListener('scroll', () => { lineNumbersDiv.scrollTop = editor.scrollTop; });
-            
-            editor.addEventListener('dblclick', () => {
-                editor.focus();
-            });
 
             const pushCurrentLine = () => {
+                isBlanked = false; 
                 const textUpToCursor = editor.value.substring(0, editor.selectionStart);
                 const lineNumber = textUpToCursor.split('\n').length - 1;
-                if (lineNumber !== localState.current_index) {
+                if (lineNumber !== localState.current_index || isBlanked) {
                     socket.emit('update_index', { room: ROOM_ID, index: lineNumber });
                 }
             };
@@ -715,6 +715,7 @@
                 editor.selectionStart = editor.selectionEnd = cursorPos;
             }
 
+            // ★ 修改：在編輯區內按右鍵，也是即時推播
             editor.addEventListener('contextmenu', (e) => { 
                 e.preventDefault(); 
                 pushCurrentLine(); 
@@ -732,52 +733,73 @@
             });
 
             document.addEventListener('keydown', (e) => {
-                // Global hotkey for font size adjustment
                 if (e.ctrlKey && (e.key === '=' || e.key === '+' || e.key === '-')) {
                     e.preventDefault();
                     const currentStyles = { ...localState.style_settings };
                     let currentSize = parseInt(currentStyles.font_size);
                     const step = 2;
-                    const minSize = 10;
-                    const maxSize = 200;
-
-                    if (e.key === '=' || e.key === '+') {
-                        currentSize += step;
-                    } else { /* It must be '-' */
-                        currentSize -= step;
-                    }
-
-                    const newSize = Math.max(minSize, Math.min(maxSize, currentSize));
-
-                    if (newSize !== currentStyles.font_size) {
-                        currentStyles.font_size = newSize;
-                        socket.emit('update_styles', { room: ROOM_ID, styles: currentStyles });
-                    }
+                    if (e.key === '=' || e.key === '+') currentSize += step;
+                    else currentSize -= step;
+                    currentStyles.font_size = Math.max(10, Math.min(200, currentSize));
+                    socket.emit('update_styles', { room: ROOM_ID, styles: currentStyles });
                 }
 
-                if (document.activeElement.tagName === 'INPUT' || document.activeElement === editor) return;
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+                if (e.code === 'Space' && !e.repeat) {
+                    e.preventDefault();
+                    if (currentSentenceLineDiv) {
+                        isBlanked = !isBlanked; 
+
+                        if (isBlanked) {
+                            socket.emit('send_content', { room: ROOM_ID, text: '' });
+                            currentSubtitleDiv.innerHTML = '';
+                            currentSentenceLineDiv.classList.remove('highlight-active');
+                            currentSentenceLineDiv.classList.add('highlight-blank');
+                        } else {
+                            const currentLine = localState.lines[localState.current_index] || '';
+                            const cleanLine = cleanLineForDisplay(currentLine);
+                            socket.emit('send_content', { room: ROOM_ID, text: cleanLine });
+                            currentSubtitleDiv.innerHTML = cleanLine.replace(/\n/g, '<br>');
+                            currentSentenceLineDiv.classList.remove('highlight-blank');
+                            currentSentenceLineDiv.classList.add('highlight-active');
+                        }
+                    }
+                    return; 
+                }
 
                 if (e.key === 'Enter' || e.key === 'ArrowRight') {
                     e.preventDefault();
                     focusEditorAtCurrentLine();
                 }
 
-                if (e.key === 'PageDown' || e.key === 'ArrowDown' || e.key === 'PageUp' || e.key === 'ArrowUp') e.preventDefault();
-                if (e.key === 'PageDown' || e.key === 'ArrowDown') {
-                    const newIndex = Math.min((localState.lines.length || 1) - 1, localState.current_index + 1);
-                    socket.emit('update_index', { room: ROOM_ID, index: newIndex });
-                }
-                if (e.key === 'PageUp' || e.key === 'ArrowUp') {
-                    const newIndex = Math.max(0, localState.current_index - 1);
-                    socket.emit('update_index', { room: ROOM_ID, index: newIndex });
+                if (['PageDown', 'ArrowDown', 'PageUp', 'ArrowUp'].includes(e.key)) {
+                    e.preventDefault();
+                    isBlanked = false; 
+                    let newIndex = localState.current_index;
+                    if (e.key === 'PageDown' || e.key === 'ArrowDown') {
+                        newIndex = Math.min((localState.lines.length || 1) - 1, localState.current_index + 1);
+                    } else {
+                        newIndex = Math.max(0, localState.current_index - 1);
+                    }
+                    if (newIndex !== localState.current_index) {
+                        socket.emit('update_index', { room: ROOM_ID, index: newIndex });
+                    }
                 }
             });
 
+            // ★ 修改：全域右鍵改為即時推播
             document.addEventListener('contextmenu', (e) => {
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.isContentEditable) {
+                if (e.target.closest('button, a, select, input, textarea, #line-numbers, #bookmarks-list')) { return; }
+                e.preventDefault();
+                pushCurrentLine();
+            });
+
+            // ★ 新增：全域左鍵單擊進入編輯模式
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('button, a, select, input, textarea, #line-numbers, #bookmarks-list')) {
                     return;
                 }
-                e.preventDefault();
                 focusEditorAtCurrentLine();
             });
 
@@ -785,38 +807,24 @@
 
             new ResizeObserver(updateStyles).observe(currentSubtitleContainer);
 
-            // ★★★ 新增 QR Code 功能的事件監聽 ★★★
             qrcodeBtn.addEventListener('click', () => {
                 const url = viewerLinkAnchor.href;
                 if (!url || url.includes('#')) {
                     alert('連結尚未產生，請稍候...');
                     return;
                 }
-                
-                // 清空舊的 QR Code
                 qrcodeContainer.innerHTML = '';
-
                 try {
-                    // 產生 QR Code
-                    const qr = qrcode(0, 'L'); // 類型 0: 自動, 糾錯等級 L
+                    const qr = qrcode(0, 'L');
                     qr.addData(url);
                     qr.make();
-                    
-                    // --- ★★★ 最佳實踐修改點 ★★★ ---
-                    // 1. 使用 createDataURL 生成標準的 base64 圖片源
-                    const dataUrl = qr.createDataURL(6, 10); // 尺寸 6, 邊距 10
-
-                    // 2. 建立一個標準的 <img> 元素
+                    const dataUrl = qr.createDataURL(6, 10);
                     const imgElement = document.createElement('img');
                     imgElement.src = dataUrl;
-                    imgElement.alt = 'Viewer Link QR Code'; // 加入替代文字，對輔助功能友好
-                    imgElement.style.width = '256px';     // 強製圖片顯示大小
-                    imgElement.style.height = '256px';    // 強製圖片顯示大小
-
-                    // 3. 將我們自己建立的 <img> 元素加入到容器中
+                    imgElement.alt = 'Viewer Link QR Code';
+                    imgElement.style.width = '256px';
+                    imgElement.style.height = '256px';
                     qrcodeContainer.appendChild(imgElement);
-                    
-                    // 顯示彈出窗口
                     qrcodeModal.style.display = 'flex';
                 } catch (e) {
                     console.error('QR Code generation failed:', e);
@@ -824,61 +832,25 @@
                 }
             });
 
-            // 關閉 QR Code 彈出視窗
-            qrcodeCloseBtn.addEventListener('click', () => {
-                qrcodeModal.style.display = 'none';
-            });
-            
-            // 點擊灰色背景區域也能關閉
+            qrcodeCloseBtn.addEventListener('click', () => { qrcodeModal.style.display = 'none'; });
             qrcodeModal.addEventListener('click', (e) => {
-                if (e.target === qrcodeModal) {
-                    qrcodeModal.style.display = 'none';
-                }
+                if (e.target === qrcodeModal) qrcodeModal.style.display = 'none';
             });
 
-            // ★★★ 新增：離開房間按鈕的事件監聽 ★★★
             leaveRoomBtn.addEventListener('click', () => {
-                // 彈出確認對話方塊
-                const confirmation = window.confirm("您確定要離開這個房間的導播頁面嗎？\n\n（這將會中斷與伺服器的連線，並顯示一個結束畫面。）");
-
-                // 如果使用者點選了“確認”
-                if (confirmation) {
-                    // 停止與伺服器的所有通訊
-                    if (socket && socket.connected) {
-                        socket.disconnect();
-                    }
-                    
-                    // 替換整個頁面內容為一個靜態的 "Goodbye" 畫面
+                if (window.confirm("您確定要離開這個房間的導播頁面嗎？\n\n（這將會中斷與伺服器的連線，並顯示一個結束畫面。）")) {
+                    if (socket && socket.connected) socket.disconnect();
                     document.documentElement.innerHTML = `
                         <head>
-                            <meta charset="UTF-8">
-                            <title>已離開</title>
+                            <meta charset="UTF-8"><title>已離開</title>
                             <style>
-                                body {
-                                    background-color: #2c3e50;
-                                    color: #ecf0f1;
-                                    display: flex;
-                                    justify-content: center;
-                                    align-items: center;
-                                    height: 100vh;
-                                    margin: 0;
-                                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                                }
-                                h1 {
-                                    font-size: 4rem;
-                                    font-weight: 300;
-                                    border: 2px solid #ecf0f1;
-                                    padding: 20px 40px;
-                                    border-radius: 10px;
-                                }
+                                body { background-color: #2c3e50; color: #ecf0f1; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; }
+                                h1 { font-size: 4rem; font-weight: 300; border: 2px solid #ecf0f1; padding: 20px 40px; border-radius: 10px; }
                             </style>
                         </head>
-                        <body>
-                            <h1>Goodbye</h1>
-                        </body>
+                        <body><h1>Goodbye</h1></body>
                     `;
                 }
-                // 如果使用者點選“取消”，則什麼都不做
             });
         });
     </script>
