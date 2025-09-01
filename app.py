@@ -19,11 +19,11 @@ class ScriptManager:
     """每個「房間」都會有一個獨立的 ScriptManager 實例。"""
     def __init__(self):
         self.raw_text = "歡迎來到新的提詞房間！\n請開始編輯劇本..."
-        self.raw_text = "歡迎使用即時提詞機！\n\n§ 基本操作\n*   推播：使用鍵盤 ↑ ↓ 鍵選擇要推播的行。\n*   編輯：按 Enter 或 → 鍵，或在畫面任一處按滑鼠右鍵、雙擊滑鼠，可直接跳入編輯區。\n*   即時推播：在編輯區中，將游標移至目標行，按 Insert 鍵或滑鼠右鍵可立即推播該行。\n*   退出編輯：在編輯區中，按 Esc 鍵可跳出編輯模式。\n\n§ 進階功能\n*   書籤：點擊左側的行號，可以為該行新增或移除書籤，方便快速跳轉。\n*   調整字體：使用鍵盤 Ctrl 搭配 + 或 - 鍵，可隨時調整觀眾端字幕的字體大小。\n\n# 現在，開始您的表演吧！"
+        self.raw_text = "歡迎使用即時提詞機！\n\n§ 基本操作\n*   推播：使用鍵盤 ↑ ↓ 鍵、或直接用滑鼠單擊左側行號，即可推播該行。\n*   黑屏/恢復：在非編輯狀態下，按空白鍵 (Space) 可切換黑屏與恢復顯示。\n*   編輯：按 Enter 或 → 鍵，或在畫面任一處按滑鼠左鍵，可直接跳入編輯區。\n*   即時推播：在編輯區中，將游標移至目標行，按 Insert 鍵或滑鼠右鍵可立即推播該行。\n*   退出編輯：在編輯區中，按 Esc 鍵可跳出編輯模式。\n\n§ 進階功能\n*   書籤：用滑鼠快速雙擊左側的行號，可以為該行新增或移除書籤，方便快速跳轉。\n*   調整字體：使用鍵盤 Ctrl 搭配 + 或 - 鍵，可隨時調整觀眾端字幕的字體大小。\n\n# 現在，開始您的表演吧！"
         self.lines = []
         self.bookmarks = {}
         self.current_index = 0
-        self.style_settings = { 'font_size': 100, 'fg_color': '#FFFFFF', 'bg_color': '#000000', 'font_family': '\'Microsoft JhengHei\', \'蘋方-繁\', sans-serif', 'text_align': 'left', 'margin': 15 }
+        self.style_settings = { 'font_size': 100, 'fg_color': '#FFFF00', 'bg_color': '#000000', 'font_family': '\'Microsoft JhengHei\', \'蘋方-繁\', sans-serif', 'text_align': 'left', 'margin': 15 }
         self.parse_raw_text()
 
     def parse_raw_text(self):
@@ -132,6 +132,23 @@ def handle_style_update(data):
     if manager:
         manager.update_styles(data.get('styles', {}))
         emit('state_update', manager.get_full_state(), to=room_id)
+
+@socketio.on('send_content')
+def handle_send_content(data):
+    """處理來自導播端的即時內容傳送請求（例如黑屏）。"""
+    room_id = data.get('room')
+    text = data.get('text', '')
+    if room_id in rooms:
+        # 直接將收到的文字內容廣播到房間，但不儲存為永久狀態
+        emit('force_subtitle', {'text': text}, to=room_id)
+
+
+@socketio.on('ping')
+def handle_ping(data):
+    """處理客戶端的心跳 ping，回傳 pong"""
+    room_id = data.get('room')
+    if room_id and room_id in rooms:
+        emit('pong', {'timestamp': data.get('timestamp')})
 
 @socketio.on('disconnect')
 def handle_disconnect():
