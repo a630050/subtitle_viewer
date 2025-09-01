@@ -13,7 +13,7 @@
 
         /* Left Pane: Editor + Sidebar */
         .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 1em; overflow: hidden; }
-        .editor-area { display: flex; flex-direction: row; flex-grow: 1; gap: 1em; }
+        .editor-area { display: flex; flex-direction: row; flex-grow: 1; gap: 1em; position: relative; align-items: stretch; }
         
         /* Collapsible Bookmark Sidebar */
         #bookmark-sidebar { 
@@ -23,15 +23,41 @@
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
+            height: 100%; /* 確保與編輯器容器同高 */
+            max-height: 100%; /* 限制最大高度 */
+            position: relative; /* 為絕對定位的書籤列表提供定位基準 */
         }
         #bookmark-sidebar.collapsed { flex: 0 0 0px; min-width: 0; padding: 0; border: none; margin-left: -1em; }
         #bookmark-sidebar h3 { margin-bottom: 10px; white-space: nowrap; }
-        #bookmarks-list { list-style-type: none; padding: 0; overflow-y: auto; flex-grow: 1; border-top: 1px solid #eee; }
+        #bookmarks-list { 
+            list-style-type: none; 
+            padding: 0; 
+            overflow-y: scroll; 
+            border-top: 1px solid #eee; 
+            position: absolute;
+            top: 50px; /* 標題高度 */
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+        }
         #bookmarks-list li { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #bookmarks-list li:hover { background-color: #f5f5f5; }
+        .author-signature { 
+            margin-left: 15px; 
+            padding: 5px 10px; 
+            font-size: 12px; 
+            color: #666; 
+            background-color: rgba(249, 249, 249, 0.9); 
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+        }
 
         /* Editor Area */
-        .editor-wrapper { position: relative; flex: 3; /* Use flex for sizing */ border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
+        .editor-wrapper { position: relative; flex: 3; /* Use flex for sizing */ border: 1px solid #ccc; border-radius: 4px; background-color: #fff; height: 100%; }
         #sidebar-toggle-btn { 
             position: absolute; 
             top: 50%; 
@@ -159,6 +185,7 @@
                     <button id="clear-btn">清除文本</button>
                     <!-- ★★★ 新增：離開房間按鈕 ★★★ -->
                     <button id="leave-room-btn">離開房間</button>
+                    <div class="author-signature">程式作者：徐承佑</div>
                 </div>
             </div>
             <div class="editor-area">
@@ -238,6 +265,14 @@
             <button id="import-raw-btn">原文載入</button>
             <button id="import-smart-btn">智能載入</button>
             <button id="import-cancel-btn">取消</button>
+            <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px; color: #666; text-align: left;">
+                <strong>智能載入：</strong><br>
+                • 自動移除空白行<br>
+                • 將長句按標點符號分割（每行最多20字）<br>
+                • 優先在逗號、句號、問號、驚嘆號等標點處分行<br>
+                <br>
+                <strong>原文載入：</strong>保持原始格式，不做任何修改
+            </div>
         </div>
     </div>
 
@@ -300,14 +335,48 @@
             let localState = { raw_text: '', lines: [], bookmarks: {}, current_index: 0, style_settings: {} };
             let editorUpdateTimeout;
             let importedFileContent = '';
+            let heartbeatInterval;
+            let lastPongTime = Date.now();
 
-            socket.on('connect', () => { statusDiv.textContent = '已連線 ✅'; socket.emit('join', { room: ROOM_ID }); });
-            socket.on('disconnect', () => { statusDiv.textContent = '連線中斷 ❌'; });
+            socket.on('connect', () => { 
+                statusDiv.textContent = '已連線 ✅'; 
+                socket.emit('join', { room: ROOM_ID }); 
+                startHeartbeat();
+            });
+            socket.on('disconnect', () => { 
+                statusDiv.textContent = '連線中斷 ❌'; 
+                stopHeartbeat();
+            });
             socket.on('state_update', (newState) => {
                 const oldIndex = localState.current_index;
                 localState = newState;
                 updateUI(oldIndex !== newState.current_index);
             });
+            socket.on('pong', (data) => {
+                lastPongTime = Date.now();
+                const latency = lastPongTime - data.timestamp;
+                statusDiv.textContent = `已連線 ✅ (${latency}ms)`;
+            });
+
+            function startHeartbeat() {
+                stopHeartbeat(); // 清除任何現有的心跳
+                heartbeatInterval = setInterval(() => {
+                    const now = Date.now();
+                    socket.emit('ping', { room: ROOM_ID, timestamp: now });
+                    
+                    // 檢查是否超過 10 秒沒收到 pong
+                    if (now - lastPongTime > 10000) {
+                        statusDiv.textContent = '連線異常 ⚠️';
+                    }
+                }, 60000); // 每 60 秒發送一次心跳
+            }
+
+            function stopHeartbeat() {
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+                }
+            }
 
             function compensateForScrollbars() {
                 requestAnimationFrame(() => {
