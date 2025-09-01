@@ -21,8 +21,39 @@
             const subtitleElement = document.getElementById('subtitle-container');
             const statusElement = document.getElementById('status');
             const bodyElement = document.body;
-            socket.on('connect', () => { statusElement.textContent = "已連線"; statusElement.style.color = '#008000'; socket.emit('join', { room: ROOM_ID }); });
-            socket.on('disconnect', () => { statusElement.textContent = "連線中斷"; statusElement.style.color = '#FF0000'; });
+            let heartbeatInterval;
+            let lastPongTime = Date.now();
+
+            function startHeartbeat() {
+                if (heartbeatInterval) clearInterval(heartbeatInterval);
+                heartbeatInterval = setInterval(() => {
+                    const now = Date.now();
+                    socket.emit('ping', { room: ROOM_ID, timestamp: now });
+                    
+                    if (now - lastPongTime > 10000) {
+                        statusElement.textContent = "連線異常";
+                        statusElement.style.color = '#FFA500';
+                    }
+                }, 60000);
+            }
+
+            socket.on('connect', () => { 
+                statusElement.textContent = "已連線"; 
+                statusElement.style.color = '#008000'; 
+                socket.emit('join', { room: ROOM_ID }); 
+                startHeartbeat();
+            });
+            socket.on('disconnect', () => { 
+                statusElement.textContent = "連線中斷"; 
+                statusElement.style.color = '#FF0000'; 
+                if (heartbeatInterval) clearInterval(heartbeatInterval);
+            });
+            socket.on('pong', (data) => {
+                lastPongTime = Date.now();
+                const latency = lastPongTime - data.timestamp;
+                statusElement.textContent = `已連線 (${latency}ms)`;
+                statusElement.style.color = '#008000';
+            });
             socket.on('state_update', (state) => {
                 const currentLine = state.lines[state.current_index] || '';
                 const cleanLine = currentLine.replace(/^§\s*/, '').replace(/^#\s*/, '');
@@ -49,6 +80,12 @@
                     const vminSize = (styles.font_size / baseWidth) * 100;
                     subtitleElement.style.fontSize = `${vminSize}vw`;
                 }
+            });
+
+            // ★ 新增：監聽來自導播端的強制字幕更新事件
+            socket.on('force_subtitle', (data) => {
+                const text = data.text || '';
+                subtitleElement.innerHTML = text.replace(/\n/g, '<br>');
             });
         });
     </script>
