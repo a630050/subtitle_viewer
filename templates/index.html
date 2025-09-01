@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕提詞機 - 導播端</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=KaiTi&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f0f2f5; overflow: hidden; }
+        .main-container { display: flex; width: 100%; height: 100%; }
+
+        /* Left Pane: Editor + Sidebar */
+        .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 1em; overflow: hidden; }
+        .editor-area { display: flex; flex-direction: row; flex-grow: 1; gap: 1em; }
+        
+        /* Collapsible Bookmark Sidebar */
+        #bookmark-sidebar { 
+            flex: 1; /* Use flex for sizing */
+            min-width: 0; /* Allow shrinking */
+            transition: all 0.3s ease;
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        #bookmark-sidebar.collapsed { flex: 0 0 0px; min-width: 0; padding: 0; border: none; margin-left: -1em; }
+        #bookmark-sidebar h3 { margin-bottom: 10px; white-space: nowrap; }
+        #bookmarks-list { list-style-type: none; padding: 0; overflow-y: auto; flex-grow: 1; border-top: 1px solid #eee; }
+        #bookmarks-list li { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #bookmarks-list li:hover { background-color: #f5f5f5; }
+
+        /* Editor Area */
+        .editor-wrapper { position: relative; flex: 3; /* Use flex for sizing */ border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
+        #sidebar-toggle-btn { 
+            position: absolute; 
+            top: 50%; 
+            left: -1px;
+            transform: translateY(-50%); 
+            width: 18px; height: 60px; background-color: #e0e0e0; color: #555;
+            border: 1px solid #ccc; 
+            cursor: pointer; z-index: 10;
+            display: flex; align-items: center; justify-content: center; font-size: 1.2em;
+            border-radius: 0 8px 8px 0; user-select: none;
+        }
+        #bookmark-sidebar.collapsed + .editor-wrapper #sidebar-toggle-btn { transform: translateY(-50%) scaleX(-1); }
+
+        #line-numbers {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 60px; /* Initial width, will be adjusted by JS */
+            height: 100%;
+            box-sizing: border-box;
+            font-family: monospace; 
+            font-size: 16px; 
+            line-height: 1.6; 
+            padding: 10px 0px 10px 18px; 
+            background-color: #f7f7f7; 
+            color: #aaa; 
+            text-align: right; 
+            user-select: none; 
+            border-right: 1px solid #eee; 
+            overflow: hidden; /* Hide all scrollbars */
+            cursor: pointer; 
+        }
+		#line-numbers div {
+			position: relative;
+			padding-left: 50px;
+			padding-right: 0px;
+			transition: all 0.2s;
+			box-sizing: border-box;
+			width: 100%;
+			height: 25.6px; /* 來自 line-height: 1.6 * font-size: 16px，確保高度一致 */
+
+			/* --- ★★★ Flexbox 魔法 ★★★ --- */
+			display: flex;
+			justify-content: flex-end; /* 將所有子項目推到最右邊 */
+			align-items: center;       /* 垂直居中 */
+		}
+        .bookmark-dot { position: absolute; left: 8px; /* Adjusted position */ top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background-color: #3498db; border-radius: 50%; }
+                .highlight { 
+							background-color: #ffc107 !important; 
+							color: #000 !important; 
+							font-weight: bold; 
+							}
+        
+        #script-editor {
+            position: absolute;
+            left: 60px; /* Initial value, will be adjusted by JS */
+            top: 0;
+            width: calc(100% - 60px); /* Initial value, will be adjusted by JS */
+            height: 100%;
+            box-sizing: border-box;
+            font-family: monospace; /* Reverted for user preference */
+            font-size: 16px; 
+            line-height: 1.6; 
+            border: none; 
+            padding: 10px 10px 10px 5px; 
+            resize: none; 
+            outline: none;
+            background-color: #fff;
+            overflow-y: scroll; /* Always show vertical scrollbar to prevent layout shift */
+        }
+
+        /* Right Pane: Controls */
+        .control-pane { flex: 1; border-left: 1px solid #ccc; background-color: #fff; padding: 1em; display: flex; flex-direction: column; overflow-y: auto; }
+        .control-box { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
+        .control-box h3 { margin-top: 0; font-size: 1.1em; font-weight: bold; }
+        
+        #current-subtitle { aspect-ratio: 1920 / 1080; width: 100%; padding: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: bold; line-height: 1.4; border-radius: 3px; transition: all 0.2s; }
+        #current-subtitle span { padding: 0 2.5%; }
+        #current-subtitle p { margin: 0; }
+
+                .config-buttons button { width: 100%; padding: 8px; font-size: 14px; cursor: pointer; }
+        .file-buttons button { padding: 8px; font-size: 14px; cursor: pointer; flex: 1; white-space: nowrap; }
+        .file-buttons, .config-buttons { display: flex; gap: 10px; }
+        .style-control { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .style-control label { flex-basis: 40%; }
+        .style-control input, .style-control select { flex-basis: 55%; padding: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 3px; }
+        .config-buttons { margin-top: 15px; }
+        
+        /* Other elements */
+        #status { position: fixed; bottom: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px; }
+        #file-input, #config-input { display: none; }
+        .share-box input { width: 100%; box-sizing: border-box; padding: 5px; border: 1px solid #ccc; border-radius: 3px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background-color: #fff; padding: 20px; border-radius: 5px; text-align: center; }
+
+        /* 美化新的超連結 */
+        #viewer-link-anchor {
+            display: block; /* 讓 a 標籤像塊級元素一樣佔滿整行 */
+            padding: 8px;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            color: #007bff;
+            text-decoration: none; /* 移除預設的底線 */
+            word-break: break-all; /* 如果連結太長，自動換行 */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        #viewer-link-anchor:hover {
+            background-color: #dde4ea;
+            text-decoration: underline; /* 滑鼠懸停時顯示底線 */
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="editor-pane">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>文本編輯區</h3>
+                <div class="file-buttons" style="display: flex; align-items: center; gap: 10px;">
+                    <button id="import-btn">匯入文本</button>
+                    <button id="export-btn">匯出文本</button>
+                    <button id="clear-btn">清除文本</button>
+                    <!-- ★★★ 新增：離開房間按鈕 ★★★ -->
+                    <button id="leave-room-btn">離開房間</button>
+                </div>
+            </div>
+            <div class="editor-area">
+                <div id="bookmark-sidebar" class="control-box">
+                    <h3>書籤列表</h3>
+                    <ul id="bookmarks-list"></ul>
+                </div>
+                <div class="editor-wrapper">
+                    <div id="sidebar-toggle-btn">&laquo;</div>
+                    <div id="line-numbers"></div>
+                    <textarea id="script-editor" placeholder="在此輸入或貼上文本..." wrap="off"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="control-pane">
+            <div class="control-box">
+                <h3>目前字幕 (預覽)</h3>
+                <div id="current-subtitle"><span>...</span></div>
+            </div>
+            <div class="control-box">
+                <h3>排版設定</h3>
+                <div class="style-control">
+                    <label for="font-family-select">字體</label>
+                    <select id="font-family-select">
+                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif" selected>微軟正黑體</option>
+                        <option value="'Noto Sans TC', sans-serif">思源黑體</option>
+                        <option value="KaiTi, '標楷體', serif">標楷體</option>
+                        <option value="MingLiU, '細明體', serif">細明體</option>
+                        <option value="Arial, sans-serif">Arial</option>
+                        <option value="Verdana, sans-serif">Verdana</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="font-size-input">字體大小 (px)</label>
+                    <input type="number" id="font-size-input" min="10" max="200" step="2">
+                </div>
+                <div class="style-control">
+                    <label for="fg-color-input">字體顏色</label>
+                    <input type="color" id="fg-color-input">
+                </div>
+                <div class="style-control">
+                    <label for="bg-color-input">背景顏色</label>
+                    <input type="color" id="bg-color-input">
+                </div>
+                <div class="style-control">
+                    <label for="text-align-select">排版方式</label>
+                    <select id="text-align-select">
+                        <option value="left" selected>靠左</option>
+                        <option value="center">置中</option>
+                        <option value="right">靠右</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="margin-input">左右留白 (px)</label>
+                    <input type="number" id="margin-input" min="0" max="500" step="10" value="15">
+                </div>
+                <div class="config-buttons">
+                    <button id="save-config-btn">儲存組態</button>
+                    <button id="load-config-btn">載入組態</button>
+                </div>
+            </div>
+            <div class="control-box share-box">
+                <h3>分享給觀眾</h3>
+                <p>點擊下方連結在新分頁開啟，或產生 QR Code 分享。</p>
+                <!-- 將 input 改成 a 標籤 -->
+                <a href="#" id="viewer-link-anchor" target="_blank" rel="noopener noreferrer">正在產生連結...</a>
+                <!-- 新增 QR Code 按鈕 -->
+                <button id="qrcode-btn" style="width: 100%; margin-top: 10px; padding: 8px;">產生 QR Code</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="import-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h4>載入模式</h4>
+            <p>請選擇匯入文本的方式：</p>
+            <button id="import-raw-btn">原文載入</button>
+            <button id="import-smart-btn">智能載入</button>
+            <button id="import-cancel-btn">取消</button>
+        </div>
+    </div>
+
+    <!-- ★★★ 新增：QR Code 彈出視窗 (Modal) ★★★ -->
+    <div id="qrcode-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="padding: 30px;">
+            <h4>觀眾端連結 QR Code</h4>
+            <div id="qrcode-container" style="margin: 20px 0; min-width: 256px; min-height: 256px;">
+                <!-- QR Code 將會被繪製在這裡 -->
+            </div>
+            <button id="qrcode-close-btn">關閉</button>
+        </div>
+    </div>
+
+    <div id="status">正在連線...</div>
+    <input type="file" id="file-input" accept=".txt">
+    <input type="file" id="config-input" accept=".json">
+
+    <!-- ★★★ 新增：引入 QR Code 生成函式庫 ★★★ -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const ROOM_ID = "{{ room_id }}";
+
+            const editor = document.getElementById('script-editor'),
+                  lineNumbersDiv = document.getElementById('line-numbers'),
+                  statusDiv = document.getElementById('status'),
+                  currentSubtitleDiv = document.getElementById('current-subtitle').querySelector('span'),
+                  currentSubtitleContainer = document.getElementById('current-subtitle'),
+                  bookmarksList = document.getElementById('bookmarks-list'),
+                  clearBtn = document.getElementById('clear-btn'),
+                  importBtn = document.getElementById('import-btn'),
+                  exportBtn = document.getElementById('export-btn'),
+                  fileInput = document.getElementById('file-input'),
+                  fontSizeInput = document.getElementById('font-size-input'),
+                  fgColorInput = document.getElementById('fg-color-input'),
+                  bgColorInput = document.getElementById('bg-color-input'),
+                  fontFamilySelect = document.getElementById('font-family-select'),
+                  textAlignSelect = document.getElementById('text-align-select'),
+                  marginInput = document.getElementById('margin-input'),
+                  saveConfigBtn = document.getElementById('save-config-btn'),
+                  loadConfigBtn = document.getElementById('load-config-btn'),
+                  configInput = document.getElementById('config-input'),
+                  importModal = document.getElementById('import-modal'),
+                  importRawBtn = document.getElementById('import-raw-btn'),
+                  importSmartBtn = document.getElementById('import-smart-btn'),
+                  importCancelBtn = document.getElementById('import-cancel-btn'),
+                  bookmarkSidebar = document.getElementById('bookmark-sidebar'),
+                  sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'),
+                  // ★ 新增以下變數
+                  viewerLinkAnchor = document.getElementById('viewer-link-anchor'),
+                  qrcodeBtn = document.getElementById('qrcode-btn'),
+                  qrcodeModal = document.getElementById('qrcode-modal'),
+                  qrcodeContainer = document.getElementById('qrcode-container'),
+                  qrcodeCloseBtn = document.getElementById('qrcode-close-btn'),
+                  leaveRoomBtn = document.getElementById('leave-room-btn');
+
+            let localState = { raw_text: '', lines: [], bookmarks: {}, current_index: 0, style_settings: {} };
+            let editorUpdateTimeout;
+            let importedFileContent = '';
+
+            socket.on('connect', () => { statusDiv.textContent = '已連線 ✅'; socket.emit('join', { room: ROOM_ID }); });
+            socket.on('disconnect', () => { statusDiv.textContent = '連線中斷 ❌'; });
+            socket.on('state_update', (newState) => {
+                const oldIndex = localState.current_index;
+                localState = newState;
+                updateUI(oldIndex !== newState.current_index);
+            });
+
+            function compensateForScrollbars() {
+                requestAnimationFrame(() => {
+                    const originalPaddingRight = '5px';
+                    const originalPaddingBottom = '10px';
+                    lineNumbersDiv.style.paddingRight = originalPaddingRight;
+                    lineNumbersDiv.style.paddingBottom = originalPaddingBottom;
+
+                    const scrollbarWidth = editor.offsetWidth - editor.clientWidth;
+                    const scrollbarHeight = editor.offsetHeight - editor.clientHeight;
+
+                    if (scrollbarWidth > 1) { /* Allow for rounding errors */
+                        lineNumbersDiv.style.paddingRight = `${parseInt(originalPaddingRight) + scrollbarWidth}px`;
+                    }
+                    if (scrollbarHeight > 1) {
+                        lineNumbersDiv.style.paddingBottom = `${parseInt(originalPaddingBottom) + scrollbarHeight}px`;
+                    }
+                });
+            }
+
+            function updateUI(indexChanged = false) {
+                if (document.activeElement !== editor && editor.value !== localState.raw_text) {
+                    const cursorPos = editor.selectionStart;
+                    editor.value = localState.raw_text;
+                    try { editor.selectionStart = editor.selectionEnd = cursorPos; } catch (e) {}
+                }
+                
+                const currentLine = localState.lines[localState.current_index] || '';
+                const cleanLine = cleanLineForDisplay(currentLine);
+                currentSubtitleDiv.innerHTML = cleanLine.replace(/\n/g, '<br>');
+
+                updateBookmarksList();
+                updateLineNumbers();
+                updateStyles();
+                if (indexChanged) adjustScroll();
+                
+                // ★ 修改此處邏輯
+                const viewerUrl = `${window.location.origin}/viewer/${ROOM_ID}`;
+                viewerLinkAnchor.href = viewerUrl;
+                viewerLinkAnchor.textContent = viewerUrl;
+            }
+
+            function updateStyles() {
+                const styles = localState.style_settings;
+                if (!styles) return;
+                currentSubtitleContainer.style.backgroundColor = styles.bg_color;
+                currentSubtitleDiv.style.color = styles.fg_color;
+                currentSubtitleDiv.style.fontFamily = styles.font_family;
+                currentSubtitleDiv.style.textAlign = styles.text_align || 'left';
+                
+                const margin = styles.margin || 0;
+                const previewWidth = currentSubtitleContainer.clientWidth;
+                const effectiveWidth = previewWidth - (margin * 2);
+                currentSubtitleDiv.style.marginLeft = `${margin}px`;
+                currentSubtitleDiv.style.marginRight = `${margin}px`;
+                currentSubtitleDiv.style.width = `${effectiveWidth}px`;
+                
+                const newFontSize = (styles.font_size / 1920) * previewWidth;
+                currentSubtitleDiv.style.fontSize = `${newFontSize}px`;
+
+                if (document.activeElement !== fontSizeInput) fontSizeInput.value = styles.font_size;
+                if (document.activeElement !== fgColorInput) fgColorInput.value = styles.fg_color;
+                if (document.activeElement !== bgColorInput) bgColorInput.value = styles.bg_color;
+                if (document.activeElement !== fontFamilySelect) fontFamilySelect.value = styles.font_family || '';
+                if (document.activeElement !== textAlignSelect) textAlignSelect.value = styles.text_align || 'left';
+                if (document.activeElement !== marginInput) marginInput.value = styles.margin !== undefined ? styles.margin : 15;
+                compensateForScrollbars();
+            }
+
+            function updateBookmarksList() {
+                bookmarksList.innerHTML = '';
+                for (const index in localState.bookmarks) {
+                    const li = document.createElement('li');
+                    const bookmarkText = localState.bookmarks[index];
+                    li.textContent = `${parseInt(index) + 1}: ${bookmarkText}`;
+                    li.title = bookmarkText;
+                    li.dataset.index = index;
+                    li.addEventListener('click', () => socket.emit('update_index', { room: ROOM_ID, index: parseInt(index) }));
+                    bookmarksList.appendChild(li);
+                }
+            }
+
+			function updateLineNumbers() {
+				const lines = editor.value.split('\n');
+				const lineCount = lines.length;
+				const digits = String(lineCount).length;
+
+				// 寬度計算公式保持不變，它已經是正確的
+				const newWidth = 50 + (digits * 8) + 5;
+
+				// 應用統一寬度
+				if (parseInt(lineNumbersDiv.style.width) !== newWidth) {
+					lineNumbersDiv.style.width = `${newWidth}px`;
+					const newLeft = `${newWidth}px`;
+					const newEditorWidth = `calc(100% - ${newWidth}px)`;
+					editor.style.left = newLeft;
+					editor.style.width = newEditorWidth;
+				}
+
+				lineNumbersDiv.innerHTML = '';
+				lines.forEach((line, index) => {
+					const lineDiv = document.createElement('div');
+
+					// --- ★★★ 核心結構性修改 ★★★ ---
+					// 1. 創建一個專門放數字的 <span>
+					const numberSpan = document.createElement('span');
+					numberSpan.textContent = index + 1;
+					// 2. 將這個 <span> 加入到行 div 中
+					lineDiv.appendChild(numberSpan);
+					// --- ★★★ 修改結束 ★★★ ---
+
+					if (index === localState.current_index) {
+						lineDiv.classList.add('highlight');
+					}
+					
+					if (localState.bookmarks[index] !== undefined) {
+						const dot = document.createElement('span');
+						dot.className = 'bookmark-dot';
+						lineDiv.appendChild(dot);
+					}
+					
+					lineDiv.addEventListener('click', () => toggleBookmark(index));
+					lineNumbersDiv.appendChild(lineDiv);
+				});
+				
+				lineNumbersDiv.scrollTop = editor.scrollTop;
+				compensateForScrollbars();
+			}
+
+            sidebarToggleBtn.addEventListener('click', () => {
+                bookmarkSidebar.classList.toggle('collapsed');
+            });
+
+            function toggleBookmark(index) {
+                const lines = editor.value.split('\n');
+                if (index >= lines.length) return;
+                const line = lines[index];
+                if (line.trim().startsWith('§')) {
+                    lines[index] = line.replace(/^§\s*/, '');
+                } else {
+                    lines[index] = '§ ' + line;
+                }
+                const newText = lines.join('\n');
+                editor.value = newText;
+                
+                // Immediately update UI locally to feel responsive
+                updateLineNumbers();
+
+                // Then, send the update to the server
+                socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
+            }
+
+            function adjustScroll() {
+                try {
+                    const lineHeight = parseFloat(window.getComputedStyle(editor).lineHeight);
+                    if (!lineHeight) return;
+                    const editorHeight = editor.clientHeight;
+                    const linesInView = Math.floor(editorHeight / lineHeight);
+                    const currentIndex = localState.current_index;
+                    const scrollTop = editor.scrollTop;
+                    const comfortZone = 3;
+                    const comfortTopBoundary = scrollTop + (comfortZone * lineHeight);
+                    const comfortBottomBoundary = scrollTop + editorHeight - ((comfortZone + 1) * lineHeight);
+                    const currentLineY = currentIndex * lineHeight;
+                    if (currentLineY > comfortBottomBoundary) {
+                        const newScrollTop = (currentIndex - comfortZone) * lineHeight;
+                        editor.scrollTop = newScrollTop;
+                    } else if (currentLineY < comfortTopBoundary) {
+                        const newScrollTop = (currentIndex + comfortZone + 1 - linesInView) * lineHeight;
+                        editor.scrollTop = Math.max(0, newScrollTop);
+                    }
+                } catch (e) {
+                    console.error("Error adjusting scroll:", e);
+                }
+            }
+
+            function showImportModal(content) {
+                importedFileContent = content;
+                importModal.style.display = 'flex';
+            }
+
+            function smartLoad(text) {
+                const lines = text.split('\n');
+                const newLines = [];
+                const MAX_LEN = 20;
+                const punctuation = /([,.\uff0c\u3002\u3001?!;:\s])/; 
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine === '') continue;
+                    let currentLine = trimmedLine;
+                    while (currentLine.length > MAX_LEN) {
+                        let splitPos = -1;
+                        for (let i = MAX_LEN; i >= 0; i--) {
+                            if (i < currentLine.length && punctuation.test(currentLine[i])) {
+                                splitPos = i;
+                                break;
+                            }
+                        }
+                        if (splitPos !== -1) {
+                            newLines.push(currentLine.substring(0, splitPos + 1).trim());
+                            currentLine = currentLine.substring(splitPos + 1).trim();
+                        } else {
+                            newLines.push(currentLine.substring(0, MAX_LEN));
+                            currentLine = currentLine.substring(MAX_LEN).trim();
+                        }
+                    }
+                    if (currentLine.length > 0) newLines.push(currentLine);
+                }
+                return newLines.join('\n');
+            }
+
+            clearBtn.addEventListener('click', () => {
+                if (window.confirm('您確定要清空所有文本嗎？此操作無法復原。')) {
+                    editor.value = '';
+                    socket.emit('update_script', { room: ROOM_ID, raw_text: '' });
+                }
+            });
+
+            importBtn.addEventListener('click', () => { fileInput.click(); });
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => { showImportModal(e.target.result); };
+                reader.readAsText(file, 'UTF-8');
+                event.target.value = '';
+            });
+
+            exportBtn.addEventListener('click', () => {
+                const textToSave = editor.value;
+                const blob = new Blob([textToSave], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'text.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            });
+
+            importRawBtn.addEventListener('click', () => {
+                editor.value = importedFileContent;
+                socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                importModal.style.display = 'none';
+            });
+
+            importSmartBtn.addEventListener('click', () => {
+                const processedText = smartLoad(importedFileContent);
+                editor.value = processedText;
+                socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                importModal.style.display = 'none';
+            });
+
+            importCancelBtn.addEventListener('click', () => {
+                importModal.style.display = 'none';
+            });
+
+            saveConfigBtn.addEventListener('click', () => {
+                const config = localState.style_settings;
+                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'teleprompter-style.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            });
+
+            loadConfigBtn.addEventListener('click', () => { configInput.click(); });
+
+            configInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const newStyles = JSON.parse(e.target.result);
+                        if (newStyles.font_size && newStyles.fg_color && newStyles.bg_color) {
+                            socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
+                        } else { alert('無效的組態檔案格式。'); }
+                    } catch (err) { alert('讀取檔案失敗，請確認是否為正確的 JSON 檔案。'); console.error(err); }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            });
+
+            function handleStyleChange() {
+                const newStyles = { 
+                    font_size: parseInt(fontSizeInput.value),
+                    fg_color: fgColorInput.value, 
+                    bg_color: bgColorInput.value,
+                    font_family: fontFamilySelect.value,
+                    text_align: textAlignSelect.value,
+                    margin: parseInt(marginInput.value) || 15
+                };
+                socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
+            }
+            fontSizeInput.addEventListener('input', handleStyleChange);
+            fgColorInput.addEventListener('input', handleStyleChange);
+            bgColorInput.addEventListener('input', handleStyleChange);
+            fontFamilySelect.addEventListener('change', handleStyleChange);
+            textAlignSelect.addEventListener('change', handleStyleChange);
+            marginInput.addEventListener('input', handleStyleChange);
+
+            editor.addEventListener('input', () => {
+                clearTimeout(editorUpdateTimeout);
+                updateLineNumbers();
+                editorUpdateTimeout = setTimeout(() => {
+                    if (editor.value !== localState.raw_text) socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                }, 500);
+            });
+
+            editor.addEventListener('scroll', () => { lineNumbersDiv.scrollTop = editor.scrollTop; });
+            
+            editor.addEventListener('dblclick', () => {
+                editor.focus();
+            });
+
+            const pushCurrentLine = () => {
+                const textUpToCursor = editor.value.substring(0, editor.selectionStart);
+                const lineNumber = textUpToCursor.split('\n').length - 1;
+                if (lineNumber !== localState.current_index) {
+                    socket.emit('update_index', { room: ROOM_ID, index: lineNumber });
+                }
+            };
+
+            function focusEditorAtCurrentLine() {
+                editor.focus();
+                const lines = editor.value.split('\n');
+                let cursorPos = 0;
+                for (let i = 0; i < localState.current_index; i++) {
+                    cursorPos += (lines[i] || '').length + 1;
+                }
+                cursorPos += (lines[localState.current_index] || '').length;
+                editor.selectionStart = editor.selectionEnd = cursorPos;
+            }
+
+            editor.addEventListener('contextmenu', (e) => { 
+                e.preventDefault(); 
+                pushCurrentLine(); 
+            });
+
+            editor.addEventListener('keydown', (e) => {
+                if (e.key === 'Insert') {
+                    e.preventDefault();
+                    pushCurrentLine();
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    editor.blur();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                // Global hotkey for font size adjustment
+                if (e.ctrlKey && (e.key === '=' || e.key === '+' || e.key === '-')) {
+                    e.preventDefault();
+                    const currentStyles = { ...localState.style_settings };
+                    let currentSize = parseInt(currentStyles.font_size);
+                    const step = 2;
+                    const minSize = 10;
+                    const maxSize = 200;
+
+                    if (e.key === '=' || e.key === '+') {
+                        currentSize += step;
+                    } else { /* It must be '-' */
+                        currentSize -= step;
+                    }
+
+                    const newSize = Math.max(minSize, Math.min(maxSize, currentSize));
+
+                    if (newSize !== currentStyles.font_size) {
+                        currentStyles.font_size = newSize;
+                        socket.emit('update_styles', { room: ROOM_ID, styles: currentStyles });
+                    }
+                }
+
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement === editor) return;
+
+                if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    focusEditorAtCurrentLine();
+                }
+
+                if (e.key === 'PageDown' || e.key === 'ArrowDown' || e.key === 'PageUp' || e.key === 'ArrowUp') e.preventDefault();
+                if (e.key === 'PageDown' || e.key === 'ArrowDown') {
+                    const newIndex = Math.min((localState.lines.length || 1) - 1, localState.current_index + 1);
+                    socket.emit('update_index', { room: ROOM_ID, index: newIndex });
+                }
+                if (e.key === 'PageUp' || e.key === 'ArrowUp') {
+                    const newIndex = Math.max(0, localState.current_index - 1);
+                    socket.emit('update_index', { room: ROOM_ID, index: newIndex });
+                }
+            });
+
+            document.addEventListener('contextmenu', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.isContentEditable) {
+                    return;
+                }
+                e.preventDefault();
+                focusEditorAtCurrentLine();
+            });
+
+            function cleanLineForDisplay(line) { return line.replace(/^§\s*/, '').replace(/^#\s*/, ''); }
+
+            new ResizeObserver(updateStyles).observe(currentSubtitleContainer);
+
+            // ★★★ 新增 QR Code 功能的事件監聽 ★★★
+            qrcodeBtn.addEventListener('click', () => {
+                const url = viewerLinkAnchor.href;
+                if (!url || url.includes('#')) {
+                    alert('連結尚未產生，請稍候...');
+                    return;
+                }
+                
+                // 清空舊的 QR Code
+                qrcodeContainer.innerHTML = '';
+
+                try {
+                    // 產生 QR Code
+                    const qr = qrcode(0, 'L'); // 類型 0: 自動, 糾錯等級 L
+                    qr.addData(url);
+                    qr.make();
+                    
+                    // --- ★★★ 最佳實踐修改點 ★★★ ---
+                    // 1. 使用 createDataURL 生成標準的 base64 圖片源
+                    const dataUrl = qr.createDataURL(6, 10); // 尺寸 6, 邊距 10
+
+                    // 2. 建立一個標準的 <img> 元素
+                    const imgElement = document.createElement('img');
+                    imgElement.src = dataUrl;
+                    imgElement.alt = 'Viewer Link QR Code'; // 加入替代文字，對輔助功能友好
+                    imgElement.style.width = '256px';     // 強製圖片顯示大小
+                    imgElement.style.height = '256px';    // 強製圖片顯示大小
+
+                    // 3. 將我們自己建立的 <img> 元素加入到容器中
+                    qrcodeContainer.appendChild(imgElement);
+                    
+                    // 顯示彈出窗口
+                    qrcodeModal.style.display = 'flex';
+                } catch (e) {
+                    console.error('QR Code generation failed:', e);
+                    alert('產生 QR Code 失敗！');
+                }
+            });
+
+            // 關閉 QR Code 彈出視窗
+            qrcodeCloseBtn.addEventListener('click', () => {
+                qrcodeModal.style.display = 'none';
+            });
+            
+            // 點擊灰色背景區域也能關閉
+            qrcodeModal.addEventListener('click', (e) => {
+                if (e.target === qrcodeModal) {
+                    qrcodeModal.style.display = 'none';
+                }
+            });
+
+            // ★★★ 新增：離開房間按鈕的事件監聽 ★★★
+            leaveRoomBtn.addEventListener('click', () => {
+                // 彈出確認對話方塊
+                const confirmation = window.confirm("您確定要離開這個房間的導播頁面嗎？\n\n（這將會中斷與伺服器的連線，並顯示一個結束畫面。）");
+
+                // 如果使用者點選了“確認”
+                if (confirmation) {
+                    // 停止與伺服器的所有通訊
+                    if (socket && socket.connected) {
+                        socket.disconnect();
+                    }
+                    
+                    // 替換整個頁面內容為一個靜態的 "Goodbye" 畫面
+                    document.documentElement.innerHTML = `
+                        <head>
+                            <meta charset="UTF-8">
+                            <title>已離開</title>
+                            <style>
+                                body {
+                                    background-color: #2c3e50;
+                                    color: #ecf0f1;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;
+                                    height: 100vh;
+                                    margin: 0;
+                                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                                }
+                                h1 {
+                                    font-size: 4rem;
+                                    font-weight: 300;
+                                    border: 2px solid #ecf0f1;
+                                    padding: 20px 40px;
+                                    border-radius: 10px;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>Goodbye</h1>
+                        </body>
+                    `;
+                }
+                // 如果使用者點選“取消”，則什麼都不做
+            });
+        });
+    </script>
+</body>
+</html>
