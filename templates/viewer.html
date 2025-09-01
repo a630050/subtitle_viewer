@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即時字幕</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=KaiTi&display=swap" rel="stylesheet">
+    <style>html, body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; transition: background-color 0.3s; } #subtitle-container { width: 95%; padding: 1em; text-align: center; font-weight: bold; line-height: 1.4; transition: color 0.3s, font-size 0.3s, font-family 0.3s; } #subtitle-container p { margin: 0; } #status { position: absolute; top: 10px; left: 10px; font-size: 1.5vmin; color: #555; }</style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div id="status">正在連線...</div>
+    <div id="subtitle-container">等待字幕...</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const ROOM_ID = "{{ room_id }}";
+            const subtitleElement = document.getElementById('subtitle-container');
+            const statusElement = document.getElementById('status');
+            const bodyElement = document.body;
+            socket.on('connect', () => { statusElement.textContent = "已連線"; statusElement.style.color = '#008000'; socket.emit('join', { room: ROOM_ID }); });
+            socket.on('disconnect', () => { statusElement.textContent = "連線中斷"; statusElement.style.color = '#FF0000'; });
+            socket.on('state_update', (state) => {
+                const currentLine = state.lines[state.current_index] || '';
+                const cleanLine = currentLine.replace(/^§\s*/, '').replace(/^#\s*/, '');
+                const styles = state.style_settings;
+
+                if (styles && styles.display_mode === 'markdown') {
+                    subtitleElement.innerHTML = marked.parse(cleanLine, { gfm: true, breaks: true }).replace(/^<p>|<\/p>$/g, '');
+                } else {
+                    subtitleElement.innerHTML = cleanLine.replace(/\n/g, '<br>');
+                }
+
+                if (styles) {
+                    bodyElement.style.backgroundColor = styles.bg_color;
+                    subtitleElement.style.color = styles.fg_color;
+                    subtitleElement.style.fontFamily = styles.font_family;
+                    subtitleElement.style.textAlign = styles.text_align || 'left';
+                    
+                    const margin = styles.margin !== undefined ? styles.margin : 15;
+                    subtitleElement.style.marginLeft = `${margin}px`;
+                    subtitleElement.style.marginRight = `${margin}px`;
+                    subtitleElement.style.width = `calc(100% - ${margin * 2}px)`;
+                    
+                    const baseWidth = 1920; 
+                    const vminSize = (styles.font_size / baseWidth) * 100;
+                    subtitleElement.style.fontSize = `${vminSize}vw`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
