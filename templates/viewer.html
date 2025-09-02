@@ -289,7 +289,7 @@
                 subtitleContent.style.transform = 'translateY(0px)'; // Reset transform
             }
 
-            function updateScrollHighlight(currentIndex, displayLines, transitionMode) {
+            function updateScrollHighlight(currentIndex, displayLines, transitionMode, style_settings) {
                 const startIndex = Math.max(0, currentIndex - (displayLines - 1));
                 
                 document.querySelectorAll('#subtitle-container .line').forEach(el => {
@@ -306,7 +306,14 @@
 
                 const targetEl = document.getElementById(`line-${startIndex}`);
                 if (targetEl) {
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                    const verticalAlign = style_settings?.vertical_align || 'center';
+                    let blockPosition = 'center';
+                    if (verticalAlign === 'top') {
+                        blockPosition = 'start';
+                    } else if (verticalAlign === 'bottom') {
+                        blockPosition = 'end';
+                    }
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: blockPosition, inline: 'nearest' });
                 }
             }
 
