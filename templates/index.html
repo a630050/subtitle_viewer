@@ -348,6 +348,7 @@
                 <div class="config-buttons">
                     <button id="speech-toggle-btn" class="speech-btn">開始語音識別</button>
                 </div>
+                <p style="font-size: 13px; color: #666; text-align: center; margin-top: 10px;">推薦使用Edge瀏覽器使用本服務，語音轉錄效果最佳!</p>
                 <div id="speech-status" class="speech-status" style="display: none;"></div>
             </div>
             
@@ -709,14 +710,49 @@
                 const pushSettings = localState.push_settings || { display_lines: 1, transition_mode: 'fade' };
                 const displayLines = pushSettings.display_lines || 1;
                 const transitionMode = pushSettings.transition_mode || 'fade';
+                const isScroll = transitionMode === 'scroll' || transitionMode === 'scroll-normal';
 
-                const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
-                const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
-                const newHtmlContent = isBlanked ? '' : linesToShow.map(line => cleanLineForDisplay(line)).join('<br>');
+                let newHtmlContent;
+
+                if (isBlanked) {
+                    newHtmlContent = '';
+                } else if (isScroll) {
+                    const PREVIEW_CONTEXT_LINES = 4; // Number of previous lines to show
+                    const currentIndex = localState.current_index;
+                    const activeStartIndex = Math.max(0, currentIndex - (displayLines - 1));
+                    const previewStartIndex = Math.max(0, activeStartIndex - PREVIEW_CONTEXT_LINES);
+
+                    const linesForPreview = [];
+                    for (let i = previewStartIndex; i <= currentIndex; i++) {
+                        if (i < 0 || i >= localState.lines.length) continue;
+
+                        const line = localState.lines[i];
+                        const cleanedLine = cleanLineForDisplay(line);
+                        let lineHtml;
+
+                        if (i >= activeStartIndex) {
+                            // This is an active line
+                            lineHtml = `<span style="opacity: 1; display: block;">${cleanedLine}</span>`;
+                        } else {
+                            // This is a previous, context line
+                            const opacity = (transitionMode === 'scroll') ? '0.4' : '1'; // Fade for 'scroll' mode
+                            lineHtml = `<span style="opacity: ${opacity}; display: block;">${cleanedLine}</span>`;
+                        }
+                        linesForPreview.push(lineHtml);
+                    }
+                    newHtmlContent = linesForPreview.join('');
+                } else {
+                    const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
+                    const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
+                    // Use <br> for non-scroll modes to keep original behavior and valid HTML.
+                    newHtmlContent = linesToShow.map(line => cleanLineForDisplay(line)).join('<br>');
+                }
 
                 // --- [修改] 預覽視窗更新邏輯 ---
+                // The content of the preview span is now either a text node with <br>s or a set of block-like spans.
+                // The fade transition should work on the parent span that holds them all.
                 if (currentSubtitleDiv.innerHTML !== newHtmlContent) {
-                    if (transitionMode === 'fade') {
+                    if (transitionMode === 'fade' && !isScroll) {
                         currentSubtitleDiv.classList.add('hidden');
                         setTimeout(() => {
                             currentSubtitleDiv.innerHTML = newHtmlContent;
@@ -731,6 +767,8 @@
                 updateBookmarksList();
                 updateLineNumbers();
                 updateStyles();
+
+                // For scroll modes, the vertical alignment is now handled by updateStyles like all other modes.
 
                 if (document.activeElement !== broadcastModeSelect) {
                     broadcastModeSelect.value = pushSettings.broadcast_mode || 'manual';
