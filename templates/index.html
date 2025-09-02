@@ -142,9 +142,15 @@
         .control-box { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
         .control-box h3 { margin-top: 0; font-size: 1.1em; font-weight: bold; }
         
-        #current-subtitle { aspect-ratio: 1920 / 1080; width: 100%; padding: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; font-weight: bold; line-height: 1.4; border-radius: 3px; transition: all 0.2s; }
-        #current-subtitle span { padding: 0 2.5%; }
-        #current-subtitle p { margin: 0; }
+        #current-subtitle { aspect-ratio: 1920 / 1080; width: 100%; padding: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; font-weight: bold; line-height: 1.4; border-radius: 3px; background-color: #000; /* 確保有背景色 */ }
+        #current-subtitle span { 
+            width: 100%;
+            box-sizing: border-box;
+            transition: opacity 0.3s ease-in-out; /* 新增過渡效果 */
+        }
+        #current-subtitle span.hidden {
+            opacity: 0; /* 新增隱藏樣式 */
+        }
 
                 .config-buttons button { width: 100%; padding: 8px; font-size: 14px; cursor: pointer; }
         .file-buttons button { padding: 4px 8px; font-size: 14px; cursor: pointer; flex: 1; white-space: nowrap; }
@@ -180,6 +186,117 @@
             background-color: #dde4ea;
             text-decoration: underline; /* 滑鼠懸停時顯示底線 */
         }
+        
+        /* Speech recognition button styles */
+        .speech-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .speech-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .speech-btn.recording {
+            background-color: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .speech-btn.recording::after {
+            content: " (錄音中...)";
+        }
+        
+        .speech-status {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        .speech-status.error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        
+        .speech-status.success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        
+        /* 設定按鈕樣式 */
+        .settings-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .settings-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        /* 設定彈出視窗樣式 */
+        #style-settings-modal .modal-content {
+            width: 500px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 25px;
+        }
+        
+        .settings-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        
+        .settings-tab {
+            padding: 8px 15px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .settings-tab.active {
+            background-color: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+        
+        .settings-panel {
+            display: none;
+        }
+        
+        .settings-panel.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -210,51 +327,30 @@
         </div>
         <div class="control-pane">
             <div class="control-box">
-                <h3>目前字幕 (預覽)</h3>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <h3>投播效果示意</h3>
+                    <button id="style-settings-btn" class="settings-btn">設定</button>
+                </div>
                 <div id="current-subtitle"><span>...</span></div>
             </div>
+
+            
+            <!-- 新增語音識別控制區塊 -->
             <div class="control-box">
-                <h3>排版設定</h3>
+                <h3>語音識別設定</h3>
                 <div class="style-control">
-                    <label for="font-family-select">字體</label>
-                    <select id="font-family-select">
-                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif" selected>微軟正黑體</option>
-                        <option value="'Noto Sans TC', sans-serif">思源黑體</option>
-                        <option value="KaiTi, '標楷體', serif">標楷體</option>
-                        <option value="MingLiU, '細明體', serif">細明體</option>
-                        <option value="Arial, sans-serif">Arial</option>
-                        <option value="Verdana, sans-serif">Verdana</option>
+                    <label for="speech-lang-select">識別語言</label>
+                    <select id="speech-lang-select">
+                        <option value="zh-TW" selected>繁體中文</option>
+                        <option value="en-US">English</option>
                     </select>
-                </div>
-                <div class="style-control">
-                    <label for="font-size-input">字體大小 (px)</label>
-                    <input type="number" id="font-size-input" min="10" max="200" step="2">
-                </div>
-                <div class="style-control">
-                    <label for="fg-color-input">字體顏色</label>
-                    <input type="color" id="fg-color-input">
-                </div>
-                <div class="style-control">
-                    <label for="bg-color-input">背景顏色</label>
-                    <input type="color" id="bg-color-input">
-                </div>
-                <div class="style-control">
-                    <label for="text-align-select">排版方式</label>
-                    <select id="text-align-select">
-                        <option value="left" selected>靠左</option>
-                        <option value="center">置中</option>
-                        <option value="right">靠右</option>
-                    </select>
-                </div>
-                <div class="style-control">
-                    <label for="margin-input">左右留白 (px)</label>
-                    <input type="number" id="margin-input" min="0" max="500" step="10" value="15">
                 </div>
                 <div class="config-buttons">
-                    <button id="save-config-btn">儲存組態</button>
-                    <button id="load-config-btn">載入組態</button>
+                    <button id="speech-toggle-btn" class="speech-btn">開始語音識別</button>
                 </div>
+                <div id="speech-status" class="speech-status" style="display: none;"></div>
             </div>
+            
             <div class="control-box share-box">
                 <h3>分享給觀眾</h3>
                 <p>點擊下方連結在新分頁開啟，或產生 QR Code 分享。</p>
@@ -284,6 +380,94 @@
         </div>
     </div>
 
+    <!-- 排版與推播設定彈出視窗 -->
+    <div id="style-settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h4>排版與推播設定</h4>
+            <div class="settings-tabs">
+                <div class="settings-tab active" data-panel="style-panel">排版設定</div>
+                <div class="settings-tab" data-panel="broadcast-panel">推播設定</div>
+            </div>
+            
+            <!-- 排版設定面板 -->
+            <div id="style-panel" class="settings-panel active">
+                <div class="style-control">
+                    <label for="font-family-select">字體</label>
+                    <select id="font-family-select">
+                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif" selected>微軟正黑體</option>
+                        <option value="'Noto Sans TC', sans-serif">思源黑體</option>
+                        <option value="KaiTi, '標楷體', serif">標楷體</option>
+                        <option value="MingLiU, '細明體', serif">細明體</option>
+                        <option value="Arial, sans-serif">Arial</option>
+                        <option value="Verdana, sans-serif">Verdana</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="font-size-input">字體大小 (px)</label>
+                    <input type="number" id="font-size-input" min="10" max="200" step="2">
+                </div>
+                <div class="style-control">
+                    <label for="fg-color-input">字體顏色</label>
+                    <input type="color" id="fg-color-input">
+                </div>
+                <div class="style-control">
+                    <label for="bg-color-input">背景顏色</label>
+                    <input type="color" id="bg-color-input">
+                </div>
+                <div class="style-control">
+                    <label for="text-align-select">左右排版</label>
+                    <select id="text-align-select">
+                        <option value="left" selected>靠左</option>
+                        <option value="center">置中</option>
+                        <option value="right">靠右</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="vertical-align-select">上下排版</label>
+                    <select id="vertical-align-select">
+                        <option value="top">靠上</option>
+                        <option value="center" selected>置中</option>
+                        <option value="bottom">靠下</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="margin-input">左右留白 (px)</label>
+                    <input type="number" id="margin-input" min="0" max="500" step="10" value="100">
+                </div>
+            </div>
+            
+            <!-- 推播設定面板 -->
+            <div id="broadcast-panel" class="settings-panel">
+                <div class="style-control">
+                    <label for="broadcast-mode-select">投放模式</label>
+                    <select id="broadcast-mode-select">
+                        <option value="manual" selected>人工投播</option>
+                        <option value="automatic">自動最新行</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="display-lines-input">顯示行數</label>
+                    <input type="number" id="display-lines-input" min="1" max="10" value="1">
+                </div>
+                <div class="style-control">
+                    <label for="transition-mode-select">過渡方式</label>
+                    <select id="transition-mode-select">
+                        <option value="direct" selected>直接切換</option>
+                        <option value="fade">淡入淡出</option>
+                        <option value="scroll">淡出滾動</option>
+                        <option value="scroll-normal">正常滾動</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="config-buttons" style="margin-top: 20px;">
+                <button id="save-config-btn">儲存組態</button>
+                <button id="load-config-btn">載入組態</button>
+                <button id="close-settings-btn">關閉</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- ★★★ 新增：QR Code 彈出視窗 (Modal) ★★★ -->
     <div id="qrcode-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="padding: 30px;">
@@ -322,6 +506,7 @@
                   bgColorInput = document.getElementById('bg-color-input'),
                   fontFamilySelect = document.getElementById('font-family-select'),
                   textAlignSelect = document.getElementById('text-align-select'),
+                  verticalAlignSelect = document.getElementById('vertical-align-select'),
                   marginInput = document.getElementById('margin-input'),
                   saveConfigBtn = document.getElementById('save-config-btn'),
                   loadConfigBtn = document.getElementById('load-config-btn'),
@@ -337,16 +522,56 @@
                   qrcodeModal = document.getElementById('qrcode-modal'),
                   qrcodeContainer = document.getElementById('qrcode-container'),
                   qrcodeCloseBtn = document.getElementById('qrcode-close-btn'),
-                  leaveRoomBtn = document.getElementById('leave-room-btn');
+                  leaveRoomBtn = document.getElementById('leave-room-btn'),
+                  // 語音識別相關元素
+                  speechLangSelect = document.getElementById('speech-lang-select'),
+                  speechToggleBtn = document.getElementById('speech-toggle-btn'),
+                  speechStatus = document.getElementById('speech-status'),
+                  displayLinesInput = document.getElementById('display-lines-input'),
+                  transitionModeSelect = document.getElementById('transition-mode-select'),
+                  broadcastModeSelect = document.getElementById('broadcast-mode-select');
 
-            let localState = { raw_text: '', lines: [], bookmarks: {}, current_index: 0, style_settings: {} };
+            let localState = { raw_text: '', lines: [], bookmarks: {}, current_index: 0, style_settings: {}, push_settings: {} };
             let editorUpdateTimeout;
+            let collaborationUpdateTimeout; // For debouncing collaboration updates
             let importedFileContent = '';
             let heartbeatInterval;
             let lastPongTime = Date.now();
             
-            let currentSentenceLineDiv = null; 
             let isBlanked = false; 
+
+            // 語音識別相關變數
+            let recognition = null;
+            let isRecording = false;
+            let finalTranscript = '';
+            let interimTranscript = '';
+            let punctuationMarks = /[,.;:!?，。；：！？]/;
+            let sentenceEndings = /[.!?。！？]/;
+            
+            // 智能標點功能相關變數 - 優化後的時間參數
+            let lastSpeechTime = 0;
+            let silenceTimer = null;
+            let pendingText = '';
+            
+            // 分層更新機制的時間參數
+            let interimUpdateDelay = 100;    // 中間結果更新延遲
+            let interimPushDelay = 200;      // 中間結果推送延遲
+            let finalUpdateDelay = 300;      // 最終結果更新延遲
+            let finalPushDelay = 100;        // 最終結果推送延遲
+            let editorUpdateDebounce = 1000; // 編輯器更新間隔（從5000ms降到1000ms）
+            
+            // 精細化停頓時間參數 - 優化版本
+            let microPauseThreshold = 200;   // 微停頓：不添加標點
+            let shortPauseThreshold = 400;   // 短停頓：添加逗號（縮短到400ms）
+            let mediumPauseThreshold = 1200; // 中停頓：添加句號（縮短到1200ms）
+            let longPauseThreshold = 2500;   // 長停頓：添加句號並換行（縮短到2500ms）
+            let silenceCheckInterval = 150;  // 靜默檢測間隔（縮短到150ms）
+            
+            let editorUpdateTimer = null;
+            let pushUpdateTimer = null;
+            let currentInterimText = ''; // 當前顯示的中間結果
+            let commaCount = 0; // 當前行的逗號計數
+            let maxLineLength = 30; // 單行最大字符數
 
             socket.on('connect', () => { 
                 statusDiv.textContent = '已連線 ✅'; 
@@ -357,15 +582,79 @@
                 statusDiv.textContent = '連線中斷 ❌'; 
                 stopHeartbeat();
             });
-            socket.on('state_update', (newState) => {
+            socket.on('state_update', (newState) => { 
                 const oldIndex = localState.current_index;
+                const oldDisplayLines = localState.push_settings?.display_lines;
                 localState = newState;
-                updateUI(oldIndex !== newState.current_index);
+                updateUI(oldIndex !== newState.current_index || oldDisplayLines !== newState.push_settings?.display_lines);
             });
-            socket.on('pong', (data) => {
+            socket.on('pong', (data) => { 
                 lastPongTime = Date.now();
                 const latency = lastPongTime - data.timestamp;
                 statusDiv.textContent = `已連線 ✅ (${latency}ms)`;
+            });
+
+            // 設定彈出視窗相關元素
+            const styleSettingsBtn = document.getElementById('style-settings-btn');
+            const styleSettingsModal = document.getElementById('style-settings-modal');
+            const closeSettingsBtn = document.getElementById('close-settings-btn');
+            const settingsTabs = document.querySelectorAll('.settings-tab');
+            
+            // 設定彈出視窗開關
+            styleSettingsBtn.addEventListener('click', () => {
+                styleSettingsModal.style.display = 'flex';
+            });
+            
+            closeSettingsBtn.addEventListener('click', () => {
+                styleSettingsModal.style.display = 'none';
+            });
+            
+            // 點擊彈出視窗外部關閉
+            styleSettingsModal.addEventListener('click', (e) => {
+                if (e.target === styleSettingsModal) {
+                    styleSettingsModal.style.display = 'none';
+                }
+            });
+            
+            // 標籤切換功能
+            settingsTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // 移除所有標籤的active類
+                    settingsTabs.forEach(t => t.classList.remove('active'));
+                    // 添加當前標籤的active類
+                    tab.classList.add('active');
+                    
+                    // 隱藏所有面板
+                    document.querySelectorAll('.settings-panel').forEach(panel => {
+                        panel.classList.remove('active');
+                    });
+                    
+                    // 顯示對應面板
+                    const panelId = tab.getAttribute('data-panel');
+                    document.getElementById(panelId).classList.add('active');
+                });
+            });
+            
+            socket.on('editor_update', (data) => {
+                // 收到協作者的編輯更新
+                const currentCursorPos = editor.selectionStart;
+                const currentScrollTop = editor.scrollTop;
+
+                // 更新編輯器內容
+                editor.value = data.raw_text;
+
+                // 智慧地還原游標位置，避免游標跳動
+                let newCursorPos = currentCursorPos;
+                if (newCursorPos > data.raw_text.length) {
+                    newCursorPos = data.raw_text.length;
+                }
+                editor.selectionStart = editor.selectionEnd = newCursorPos;
+                
+                // 還原捲動位置
+                editor.scrollTop = currentScrollTop;
+
+                // 更新行號顯示
+                updateLineNumbers();
             });
 
             function startHeartbeat() {
@@ -384,6 +673,13 @@
                     clearInterval(heartbeatInterval);
                     heartbeatInterval = null;
                 }
+            }
+
+            function getPushOptions() {
+                return {
+                    display_lines: parseInt(displayLinesInput.value) || 1,
+                    transition_mode: transitionModeSelect.value
+                };
             }
 
             function compensateForScrollbars() {
@@ -410,13 +706,42 @@
                     try { editor.selectionStart = editor.selectionEnd = cursorPos; } catch (e) {}
                 }
                 
-                const currentLine = localState.lines[localState.current_index] || '';
-                const cleanLine = cleanLineForDisplay(currentLine);
-                currentSubtitleDiv.innerHTML = isBlanked ? '' : cleanLine.replace(/\n/g, '<br>');
+                const pushSettings = localState.push_settings || { display_lines: 1, transition_mode: 'fade' };
+                const displayLines = pushSettings.display_lines || 1;
+                const transitionMode = pushSettings.transition_mode || 'fade';
+
+                const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
+                const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
+                const newHtmlContent = isBlanked ? '' : linesToShow.map(line => cleanLineForDisplay(line)).join('<br>');
+
+                // --- [修改] 預覽視窗更新邏輯 ---
+                if (currentSubtitleDiv.innerHTML !== newHtmlContent) {
+                    if (transitionMode === 'fade') {
+                        currentSubtitleDiv.classList.add('hidden');
+                        setTimeout(() => {
+                            currentSubtitleDiv.innerHTML = newHtmlContent;
+                            currentSubtitleDiv.classList.remove('hidden');
+                        }, 150);
+                    } else { // direct or scroll
+                        currentSubtitleDiv.innerHTML = newHtmlContent;
+                    }
+                }
+                // --- [修改結束] ---
 
                 updateBookmarksList();
                 updateLineNumbers();
                 updateStyles();
+
+                if (document.activeElement !== broadcastModeSelect) {
+                    broadcastModeSelect.value = pushSettings.broadcast_mode || 'manual';
+                }
+                if (document.activeElement !== displayLinesInput) {
+                    displayLinesInput.value = pushSettings.display_lines;
+                }
+                if (document.activeElement !== transitionModeSelect) {
+                    transitionModeSelect.value = pushSettings.transition_mode;
+                }
+
                 if (indexChanged) adjustScroll();
                 
                 const viewerUrl = `${window.location.origin}/viewer/${ROOM_ID}`;
@@ -424,30 +749,110 @@
                 viewerLinkAnchor.textContent = viewerUrl;
             }
 
-            function updateStyles() {
-                const styles = localState.style_settings;
-                if (!styles) return;
-                currentSubtitleContainer.style.backgroundColor = styles.bg_color;
-                currentSubtitleDiv.style.color = styles.fg_color;
-                currentSubtitleDiv.style.fontFamily = styles.font_family;
-                currentSubtitleDiv.style.textAlign = styles.text_align || 'left';
-                
-                const margin = styles.margin || 0;
-                const previewWidth = currentSubtitleContainer.clientWidth;
-                const effectiveWidth = previewWidth - (margin * 2);
-                currentSubtitleDiv.style.marginLeft = `${margin}px`;
-                currentSubtitleDiv.style.marginRight = `${margin}px`;
-                currentSubtitleDiv.style.width = `${effectiveWidth}px`;
-                
-                const newFontSize = (styles.font_size / 1920) * previewWidth;
-                currentSubtitleDiv.style.fontSize = `${newFontSize}px`;
+            // --- [新增] 預覽窗格滾動模式相關函式 ---
+            function initializePreviewScroll() {
+                currentSubtitleContainer.innerHTML = ''; // Clear container
+                currentSubtitleContainer.classList.add('scroll-mode');
 
-                if (document.activeElement !== fontSizeInput) fontSizeInput.value = styles.font_size;
-                if (document.activeElement !== fgColorInput) fgColorInput.value = styles.fg_color;
-                if (document.activeElement !== bgColorInput) bgColorInput.value = styles.bg_color;
-                if (document.activeElement !== fontFamilySelect) fontFamilySelect.value = styles.font_family || '';
-                if (document.activeElement !== textAlignSelect) textAlignSelect.value = styles.text_align || 'left';
-                if (document.activeElement !== marginInput) marginInput.value = styles.margin !== undefined ? styles.margin : 15;
+                const topPadding = document.createElement('div');
+                topPadding.className = 'scroll-padding';
+                currentSubtitleContainer.appendChild(topPadding);
+
+                localState.lines.forEach((line, index) => {
+                    const p = document.createElement('p');
+                    p.id = `preview-line-${index}`;
+                    p.className = 'line';
+                    p.innerHTML = cleanLineForDisplay(line).replace(/\n/g, '<br>');
+                    currentSubtitleContainer.appendChild(p);
+                });
+
+                const bottomPadding = document.createElement('div');
+                bottomPadding.className = 'scroll-padding';
+                currentSubtitleContainer.appendChild(bottomPadding);
+                isPreviewScrollInitialized = true;
+                lastPreviewRawText = localState.raw_text;
+            }
+
+            function cleanupPreviewScroll() {
+                currentSubtitleContainer.classList.remove('scroll-mode');
+                currentSubtitleContainer.innerHTML = '<span>...</span>';
+                currentSubtitleDiv = currentSubtitleContainer.querySelector('span');
+                isPreviewScrollInitialized = false;
+            }
+
+            function updatePreviewScrollHighlight() {
+                if (!isPreviewScrollInitialized) return;
+                const displayLines = localState.push_settings?.display_lines || 1;
+                const currentIndex = localState.current_index || 0;
+                const startIndex = Math.max(0, currentIndex - (displayLines - 1));
+                
+                currentSubtitleContainer.querySelectorAll('.line').forEach(el => {
+                    const lineIndex = parseInt(el.id.split('-')[2]);
+
+                    if (lineIndex > currentIndex) {
+                        el.style.opacity = '0';
+                    } else if (lineIndex >= startIndex && lineIndex <= currentIndex) {
+                        el.style.opacity = '1';
+                    } else {
+                        el.style.opacity = '0.4';
+                    }
+                });
+                
+                const targetEl = document.getElementById(`preview-line-${startIndex}`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                }
+            }
+            // --- [新增結束] ---
+
+            function updateStyles() {
+                const styles = localState.style_settings || {}; // Ensure styles is an object
+                const REFERENCE_WIDTH = 1920;
+
+                const bgColor = styles.bg_color || '#000000';
+                const fgColor = styles.fg_color || '#FFFF00';
+                const fontFamily = styles.font_family || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
+                const textAlign = styles.text_align || 'left';
+                const verticalAlign = styles.vertical_align || 'center'; // Get vertical align value
+                const userMargin = styles.margin !== undefined ? styles.margin : 30;
+                const userFontSize = styles.font_size !== undefined ? styles.font_size : 100;
+
+                currentSubtitleContainer.style.backgroundColor = bgColor;
+                currentSubtitleContainer.style.color = fgColor;
+                currentSubtitleContainer.style.fontFamily = fontFamily;
+                currentSubtitleContainer.style.textAlign = textAlign;
+                currentSubtitleContainer.style.boxSizing = 'border-box';
+
+                // Set vertical alignment for the preview pane
+                if (verticalAlign === 'top') {
+                    currentSubtitleContainer.style.justifyContent = 'flex-start';
+                } else if (verticalAlign === 'bottom') {
+                    currentSubtitleContainer.style.justifyContent = 'flex-end';
+                } else {
+                    currentSubtitleContainer.style.justifyContent = 'center';
+                }
+
+                const previewWidth = currentSubtitleContainer.clientWidth;
+                if (previewWidth > 0) {
+                    const actualMargin = (userMargin / REFERENCE_WIDTH) * previewWidth;
+                    const textAreaWidth = previewWidth - (actualMargin * 2);
+                    const referenceTextAreaWidth = REFERENCE_WIDTH - (userMargin * 2);
+                    const actualFontSize = (userFontSize / referenceTextAreaWidth) * textAreaWidth;
+
+                    currentSubtitleContainer.style.paddingLeft = `${actualMargin}px`;
+                    currentSubtitleContainer.style.paddingRight = `${actualMargin}px`;
+                    currentSubtitleContainer.style.fontSize = `${actualFontSize}px`;
+                }
+
+                // 更新控制面板中的輸入框值
+                if (document.activeElement !== fontSizeInput) fontSizeInput.value = userFontSize;
+                if (document.activeElement !== fgColorInput) fgColorInput.value = fgColor;
+                if (document.activeElement !== bgColorInput) bgColorInput.value = bgColor;
+                if (document.activeElement !== fontFamilySelect) fontFamilySelect.value = fontFamily;
+                if (document.activeElement !== textAlignSelect) textAlignSelect.value = textAlign;
+                if (document.activeElement !== verticalAlignSelect) verticalAlignSelect.value = styles.vertical_align || 'center';
+                if (document.activeElement !== marginInput) marginInput.value = userMargin;
+                
                 compensateForScrollbars();
             }
 
@@ -461,7 +866,7 @@
                     li.dataset.index = index;
                     li.addEventListener('click', () => {
                         isBlanked = false; 
-                        socket.emit('update_index', { room: ROOM_ID, index: parseInt(index) });
+                        socket.emit('update_index', { room: ROOM_ID, index: parseInt(index), ...getPushOptions() });
                     });
                     bookmarksList.appendChild(li);
                 }
@@ -481,9 +886,8 @@
 					editor.style.width = newEditorWidth;
 				}
 
-                if (currentSentenceLineDiv) {
-                    currentSentenceLineDiv.classList.remove('highlight-active', 'highlight-blank');
-                }
+                const displayLines = localState.push_settings?.display_lines || 1;
+                const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
 
 				lineNumbersDiv.innerHTML = '';
 				lines.forEach((line, index) => {
@@ -492,14 +896,13 @@
 					numberSpan.textContent = index + 1;
 					lineDiv.appendChild(numberSpan);
 
-					if (index === localState.current_index) {
+                    if (index >= startIndex && index <= localState.current_index) {
                         if (isBlanked) {
 						    lineDiv.classList.add('highlight-blank');
                         } else {
 						    lineDiv.classList.add('highlight-active');
                         }
-                        currentSentenceLineDiv = lineDiv;
-					}
+                    }
 					
 					if (localState.bookmarks[index] !== undefined) {
 						const dot = document.createElement('span');
@@ -509,7 +912,7 @@
 					
                     lineDiv.addEventListener('click', () => {
                         isBlanked = false; 
-                        socket.emit('update_index', { room: ROOM_ID, index: index });
+                        socket.emit('update_index', { room: ROOM_ID, index: index, ...getPushOptions() });
                     });
                     lineDiv.addEventListener('dblclick', () => {
                         toggleBookmark(index);
@@ -678,18 +1081,70 @@
                     bg_color: bgColorInput.value,
                     font_family: fontFamilySelect.value,
                     text_align: textAlignSelect.value,
+                    vertical_align: verticalAlignSelect.value,
                     margin: parseInt(marginInput.value) || 15
                 };
                 socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
+
+                // ★ 新增：立即更新本地預覽 (Adapted from advice)
+                // Update local state immediately
+                Object.assign(localState.style_settings, newStyles);
+                // Re-render the UI immediately
+                updateUI();
             }
             [fontSizeInput, fgColorInput, bgColorInput, marginInput].forEach(el => el.addEventListener('input', handleStyleChange));
-            [fontFamilySelect, textAlignSelect].forEach(el => el.addEventListener('change', handleStyleChange));
+            [fontFamilySelect, textAlignSelect, verticalAlignSelect].forEach(el => el.addEventListener('change', handleStyleChange));
+
+
+            function handlePushSettingsChange() {
+                const settings = {
+                    display_lines: parseInt(displayLinesInput.value) || 1,
+                    transition_mode: transitionModeSelect.value,
+                    broadcast_mode: broadcastModeSelect.value
+                };
+                socket.emit('update_push_settings', { room: ROOM_ID, settings: settings });
+            }
+            displayLinesInput.addEventListener('input', handlePushSettingsChange);
+            transitionModeSelect.addEventListener('change', handlePushSettingsChange);
+            broadcastModeSelect.addEventListener('change', handlePushSettingsChange);
+
+            // ★ 新增：用於廣播協作變更的函式
+            function broadcastEditorChanges() {
+                socket.emit('editor_change', {
+                    room: ROOM_ID,
+                    raw_text: editor.value,
+                    cursor_pos: editor.selectionStart
+                });
+                // 觸發自動推播檢查，確保自動模式下行為一致
+                autoFollowCurrentLine();
+            }
+
+            // ★ 新增：帶有防抖機制的協作更新排程函式
+            function scheduleCollaborationUpdate() {
+                clearTimeout(collaborationUpdateTimeout);
+                collaborationUpdateTimeout = setTimeout(broadcastEditorChanges, 250); // 250ms 延遲
+            }
+
 
             editor.addEventListener('input', () => {
-                clearTimeout(editorUpdateTimeout);
                 updateLineNumbers();
+
+                // ★ 新增：即時廣播編輯中狀態給其他協作者
+                socket.emit('editor_change', {
+                    room: ROOM_ID,
+                    raw_text: editor.value,
+                    cursor_pos: editor.selectionStart
+                });
+
+                // ★ 新增：在手動輸入時也觸發自動推播檢查
+                autoFollowCurrentLine();
+
+                // 保留原本的延遲全量更新，作為最終同步和儲存的機制
+                clearTimeout(editorUpdateTimeout);
                 editorUpdateTimeout = setTimeout(() => {
-                    if (editor.value !== localState.raw_text) socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                    if (editor.value !== localState.raw_text) {
+                        socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                    }
                 }, 500);
             });
 
@@ -700,7 +1155,7 @@
                 const textUpToCursor = editor.value.substring(0, editor.selectionStart);
                 const lineNumber = textUpToCursor.split('\n').length - 1;
                 if (lineNumber !== localState.current_index || isBlanked) {
-                    socket.emit('update_index', { room: ROOM_ID, index: lineNumber });
+                    socket.emit('update_index', { room: ROOM_ID, index: lineNumber, ...getPushOptions() });
                 }
             };
 
@@ -715,7 +1170,6 @@
                 editor.selectionStart = editor.selectionEnd = cursorPos;
             }
 
-            // ★ 修改：在編輯區內按右鍵，也是即時推播
             editor.addEventListener('contextmenu', (e) => { 
                 e.preventDefault(); 
                 pushCurrentLine(); 
@@ -748,23 +1202,24 @@
 
                 if (e.code === 'Space' && !e.repeat) {
                     e.preventDefault();
-                    if (currentSentenceLineDiv) {
-                        isBlanked = !isBlanked; 
-
-                        if (isBlanked) {
-                            socket.emit('send_content', { room: ROOM_ID, text: '' });
-                            currentSubtitleDiv.innerHTML = '';
-                            currentSentenceLineDiv.classList.remove('highlight-active');
-                            currentSentenceLineDiv.classList.add('highlight-blank');
-                        } else {
-                            const currentLine = localState.lines[localState.current_index] || '';
-                            const cleanLine = cleanLineForDisplay(currentLine);
-                            socket.emit('send_content', { room: ROOM_ID, text: cleanLine });
-                            currentSubtitleDiv.innerHTML = cleanLine.replace(/\n/g, '<br>');
-                            currentSentenceLineDiv.classList.remove('highlight-blank');
-                            currentSentenceLineDiv.classList.add('highlight-active');
-                        }
+                    isBlanked = !isBlanked;
+                    
+                    // The visual update is handled by updateUI and updateLineNumbers,
+                    // which are called after the state update.
+                    // For immediate feedback, we can call them directly,
+                    // but it's better to just emit the event and let the state update drive the UI.
+                    
+                    if (isBlanked) {
+                        socket.emit('send_content', { room: ROOM_ID, text: '' });
+                    } else {
+                        const displayLines = localState.push_settings?.display_lines || 1;
+                        const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
+                        const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
+                        const content = linesToShow.map(line => cleanLineForDisplay(line)).join('\n');
+                        socket.emit('send_content', { room: ROOM_ID, text: content });
                     }
+                    // Manually trigger a UI update for instant local feedback
+                    updateUI();
                     return; 
                 }
 
@@ -783,7 +1238,7 @@
                         newIndex = Math.max(0, localState.current_index - 1);
                     }
                     if (newIndex !== localState.current_index) {
-                        socket.emit('update_index', { room: ROOM_ID, index: newIndex });
+                        socket.emit('update_index', { room: ROOM_ID, index: newIndex, ...getPushOptions() });
                     }
                 }
             });
@@ -844,12 +1299,707 @@
                         <head>
                             <meta charset="UTF-8"><title>已離開</title>
                             <style>
-                                body { background-color: #2c3e50; color: #ecf0f1; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; }
+                                body { background-color: #2c3e50; color: #ecf0f1; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
                                 h1 { font-size: 4rem; font-weight: 300; border: 2px solid #ecf0f1; padding: 20px 40px; border-radius: 10px; }
                             </style>
                         </head>
                         <body><h1>Goodbye</h1></body>
                     `;
+                }
+            });
+            
+            // 語音識別功能實現
+            function initializeSpeechRecognition() {
+                console.log('初始化語音識別...');
+                
+                // 檢查瀏覽器是否支援語音識別
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    showSpeechStatus('您的瀏覽器不支援語音識別功能。請使用最新版的 Chrome 瀏覽器。', 'error');
+                    return false;
+                }
+                
+                // 創建語音識別實例
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                
+                // 設定語音識別參數
+                recognition.continuous = true; // 持續識別
+                recognition.interimResults = true; // 獲取中間結果
+                recognition.lang = speechLangSelect.value; // 設定語言
+                recognition.maxAlternatives = 1; // 只返回一個識別結果
+                
+                console.log('語音識別參數設定:', {
+                    continuous: recognition.continuous,
+                    interimResults: recognition.interimResults,
+                    lang: recognition.lang
+                });
+                
+                // 事件處理
+                recognition.onstart = function() {
+                    console.log('語音識別已啟動');
+                    isRecording = true;
+                    speechToggleBtn.disabled = false;
+                speechToggleBtn.classList.add('recording');
+                speechToggleBtn.textContent = '停止語音識別';
+                    showSpeechStatus('語音識別已啟動，請開始說話...', 'success');
+                };
+                
+                recognition.onresult = function(event) {
+                    console.log('語音識別結果事件:', event);
+                    let newFinalTranscript = '';
+                    let newInterimTranscript = '';
+                    
+                    // 處理識別結果
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        console.log('識別結果:', i, transcript, 'isFinal:', event.results[i].isFinal);
+                        
+                        if (event.results[i].isFinal) {
+                            newFinalTranscript += transcript;
+                        } else {
+                            newInterimTranscript += transcript;
+                        }
+                    }
+                    
+                    // 如果有新的最終結果
+                    if (newFinalTranscript) {
+                        console.log('處理最終識別結果:', newFinalTranscript);
+                        finalTranscript += newFinalTranscript;
+                        
+                        // 更新語音時間戳（只在最終結果時更新，用於靜默檢測）
+                        lastSpeechTime = Date.now();
+                        console.log('最終結果更新語音時間戳:', lastSpeechTime);
+                        
+                        // 清除待處理的中間文本
+                        clearPendingInterimText();
+                        // 處理最終結果並插入編輯器
+                        processAndInsertFinalTranscript(newFinalTranscript);
+                        
+                        // 最終結果後立即開始靜默檢測
+                        setupSilenceDetection();
+                    }
+                    
+                    // 處理中間結果的即時顯示
+                    interimTranscript = newInterimTranscript;
+                    if (interimTranscript) {
+                        handleInterimResult(interimTranscript);
+                        showSpeechStatus(`識別中: ${interimTranscript}`, 'success');
+                        
+                        // 中間結果不重置靜默檢測，避免干擾停頓判斷
+                        // setupSilenceDetection(); // 註釋掉這行
+                    }
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('語音識別錯誤:', event.error, event);
+                    
+                    // 根據錯誤類型決定是否重新啟動
+                    if (event.error === 'no-speech') {
+                        console.log('沒有檢測到語音，自動重新啟動...');
+                        showSpeechStatus('等待語音輸入...', 'success');
+                        // 立即重新啟動，不顯示錯誤
+                        if (isRecording) {
+                            setTimeout(() => {
+                                if (isRecording && recognition) {
+                                    try {
+                                        recognition.start();
+                                        console.log('no-speech 重新啟動成功');
+                                    } catch (e) {
+                                        console.error('no-speech 重新啟動失敗:', e);
+                                        showSpeechStatus(`重新啟動失敗: ${e.message}`, 'error');
+                                    }
+                                }
+                            }, 500); // 縮短延遲時間
+                        }
+                    } else if (event.error === 'audio-capture') {
+                        showSpeechStatus('麥克風錯誤，請檢查麥克風設定', 'error');
+                        // 嘗試重新啟動
+                        if (isRecording) {
+                            setTimeout(() => {
+                                if (isRecording && recognition) {
+                                    try {
+                                        recognition.start();
+                                    } catch (e) {
+                                        console.error('audio-capture 重新啟動失敗:', e);
+                                        showSpeechStatus(`麥克風重新啟動失敗: ${e.message}`, 'error');
+                                    }
+                                }
+                            }, 1000);
+                        }
+                    } else if (event.error === 'not-allowed') {
+                        showSpeechStatus('語音識別被拒絕，請允許麥克風權限後重新啟動', 'error');
+                        stopSpeechRecognition();
+                    } else if (event.error === 'network') {
+                        console.log('網路錯誤，嘗試重新啟動...');
+                        showSpeechStatus('網路連線問題，正在重試...', 'success');
+                        if (isRecording) {
+                            setTimeout(() => {
+                                if (isRecording && recognition) {
+                                    try {
+                                        recognition.start();
+                                    } catch (e) {
+                                        console.error('network 重新啟動失敗:', e);
+                                        showSpeechStatus(`網路重新連線失敗: ${e.message}`, 'error');
+                                    }
+                                }
+                            }, 2000);
+                        }
+                    } else {
+                        console.log('其他錯誤，嘗試重新啟動:', event.error);
+                        showSpeechStatus(`正在重新連線... (${event.error})`, 'success');
+                        // 對於其他錯誤，嘗試重新啟動
+                        if (isRecording) {
+                            setTimeout(() => {
+                                if (isRecording && recognition) {
+                                    try {
+                                        recognition.start();
+                                    } catch (e) {
+                                        console.error('其他錯誤重新啟動失敗:', e);
+                                        showSpeechStatus(`重新啟動失敗: ${e.message}`, 'error');
+                                        stopSpeechRecognition();
+                                    }
+                                }
+                            }, 1000);
+                        }
+                    }
+                };
+                
+                recognition.onend = function() {
+                    console.log('語音識別已結束, isRecording:', isRecording);
+                    if (isRecording) {
+                        // 如果還在錄音狀態，立即重新啟動識別
+                        console.log('自動重新啟動語音識別...');
+                        showSpeechStatus('持續監聽中...', 'success');
+                        
+                        // 縮短延遲時間，提高連續性
+                        setTimeout(() => {
+                            if (isRecording && recognition) {
+                                try {
+                                    recognition.start();
+                                    console.log('onend 重新啟動成功');
+                                } catch (e) {
+                                    console.error('onend 重新啟動失敗:', e);
+                                    // 如果直接啟動失敗，嘗試重新初始化
+                                    if (e.name === 'InvalidStateError') {
+                                        console.log('嘗試重新初始化語音識別...');
+                                        if (initializeSpeechRecognition()) {
+                                            try {
+                                                recognition.lang = speechLangSelect.value;
+                                                recognition.start();
+                                                console.log('重新初始化後啟動成功');
+                                            } catch (e2) {
+                                                console.error('重新初始化後啟動仍失敗:', e2);
+                                                showSpeechStatus(`重新啟動失敗: ${e2.message}`, 'error');
+                                                stopSpeechRecognition();
+                                            }
+                                        }
+                                    } else {
+                                        showSpeechStatus(`重新啟動失敗: ${e.message}`, 'error');
+                                        stopSpeechRecognition();
+                                    }
+                                }
+                            }
+                        }, 300); // 縮短到300ms，提高響應速度
+                    } else {
+                        console.log('正常停止語音識別');
+                        stopSpeechRecognition();
+                    }
+                };
+                
+                return true;
+            }
+            
+            function startSpeechRecognition() {
+                console.log('開始語音識別...');
+                
+                // 如果已經在錄音，先停止
+                if (isRecording) {
+                    console.log('已在錄音狀態，先停止');
+                    stopSpeechRecognition();
+                }
+                
+                // 自動聚焦到編輯器並設置游標位置到末尾
+                editor.focus();
+                const textLength = editor.value.length;
+                editor.selectionStart = editor.selectionEnd = textLength;
+                console.log('自動聚焦編輯器，游標位置:', textLength);
+                
+                if (!recognition) {
+                    console.log('初始化語音識別實例');
+                    if (!initializeSpeechRecognition()) {
+                        return;
+                    }
+                }
+                
+                // 更新語言設定
+                recognition.lang = speechLangSelect.value;
+                console.log('設定語音識別語言:', recognition.lang);
+                
+                try {
+                    recognition.start();
+                    finalTranscript = '';
+                    interimTranscript = '';
+                    console.log('語音識別已啟動');
+                } catch (e) {
+                    console.error('啟動語音識別失敗:', e);
+                    showSpeechStatus(`啟動語音識別失敗: ${e.message}`, 'error');
+                    // 如果啟動失敗，嘗試重新初始化
+                    recognition = null;
+                    if (initializeSpeechRecognition()) {
+                        try {
+                            recognition.lang = speechLangSelect.value;
+                            recognition.start();
+                            finalTranscript = '';
+                            interimTranscript = '';
+                        } catch (e2) {
+                            console.error('重新初始化後啟動語音識別仍失敗:', e2);
+                            showSpeechStatus(`語音識別啟動失敗: ${e2.message}`, 'error');
+                        }
+                    }
+                }
+            }
+            
+            function stopSpeechRecognition() {
+                console.log('停止語音識別...');
+                isRecording = false;
+                
+                if (recognition) {
+                    try {
+                        recognition.stop();
+                        console.log('語音識別已停止');
+                    } catch (e) {
+                        console.error('停止語音識別時發生錯誤:', e);
+                    }
+                }
+                
+                speechToggleBtn.disabled = false;
+                speechToggleBtn.classList.remove('recording');
+                speechToggleBtn.textContent = '開始語音識別';
+                
+                // 清除所有計時器
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
+                    silenceTimer = null;
+                }
+                if (editorUpdateTimer) {
+                    clearTimeout(editorUpdateTimer);
+                    editorUpdateTimer = null;
+                }
+                if (pushUpdateTimer) {
+                    clearTimeout(pushUpdateTimer);
+                    pushUpdateTimer = null;
+                }
+                
+                // 重置逗號計數
+                commaCount = 0;
+                
+                // 處理最後的中間結果
+                if (interimTranscript) {
+                    processAndInsertFinalTranscript(interimTranscript);
+                    interimTranscript = '';
+                }
+                
+                // 清除待處理的中間文本
+                clearPendingInterimText();
+                
+                showSpeechStatus('語音識別已停止', 'success');
+            }
+            
+            // 處理中間結果的即時顯示 - 使用分層更新機制
+            function handleInterimResult(text) {
+                if (!text.trim()) return;
+                
+                console.log('處理中間結果:', text);
+                
+                // 清除之前的中間文本
+                clearPendingInterimText();
+                
+                // 在游標位置插入中間結果
+                const cursorPos = editor.selectionStart;
+                const textBefore = editor.value.substring(0, cursorPos);
+                const textAfter = editor.value.substring(cursorPos);
+                
+                // 檢查是否需要在文字前添加空格或換行
+                let separator = '';
+                let willCreateNewLine = false;
+                
+                if (textBefore && !textBefore.endsWith('\n') && !textBefore.endsWith(' ')) {
+                    separator = ' ';
+                }
+                
+                // 檢查中間結果是否會導致字數超限
+                const currentLineStart = textBefore.lastIndexOf('\n') + 1;
+                const currentLineText = textBefore.substring(currentLineStart);
+                if (currentLineText.length + text.length > maxLineLength) {
+                    separator = '\n';
+                    willCreateNewLine = true;
+                    console.log('中間結果字數即將超限，預先換行');
+                }
+                
+                // 插入中間結果
+                currentInterimText = separator + text;
+                editor.value = textBefore + currentInterimText + textAfter;
+                
+                // 更新游標位置
+                const newCursorPos = cursorPos + currentInterimText.length;
+                editor.selectionStart = editor.selectionEnd = newCursorPos;
+
+                // ★ 新增：觸發協作更新
+                scheduleCollaborationUpdate();
+                
+                // 立即更新行號（中間結果需要即時反饋）
+                setTimeout(() => {
+                    updateLineNumbers();
+                }, interimUpdateDelay);
+                
+                // 語音模式下自動推送當前行
+                if (isRecording) {
+                    if (willCreateNewLine) {
+                        // 如果中間結果觸發了換行，立即推送到新行
+                        console.log('中間結果觸發自動換行，立即推送到新行');
+                        setTimeout(() => {
+                            autoFollowCurrentLine();
+                        }, interimPushDelay);
+                    } else {
+                        // 正常推送
+                        setTimeout(() => {
+                            autoFollowCurrentLine();
+                        }, interimPushDelay);
+                    }
+                }
+                
+                // 不對中間結果使用長時間防抖，保持即時性
+            }
+            
+            // 清除待處理的中間文本
+            function clearPendingInterimText() {
+                if (currentInterimText) {
+                    const cursorPos = editor.selectionStart;
+                    const textBefore = editor.value.substring(0, cursorPos - currentInterimText.length);
+                    const textAfter = editor.value.substring(cursorPos);
+                    
+                    editor.value = textBefore + textAfter;
+                    editor.selectionStart = editor.selectionEnd = cursorPos - currentInterimText.length;
+                    currentInterimText = '';
+                    // ★ 新增：觸發協作更新
+                    scheduleCollaborationUpdate();
+                }
+            }
+            
+            // 處理最終識別結果 - 使用分層更新機制
+            function processAndInsertFinalTranscript(text) {
+                if (!text.trim()) return;
+                
+                console.log('處理最終識別文字:', text);
+                
+                // 在游標位置插入識別的文字
+                const cursorPos = editor.selectionStart;
+                const textBefore = editor.value.substring(0, cursorPos);
+                const textAfter = editor.value.substring(cursorPos);
+                
+                // 檢查是否需要在文字前添加空格
+                let separator = '';
+                let willCreateNewLine = false;
+                
+                if (textBefore && !textBefore.endsWith('\n') && !textBefore.endsWith(' ')) {
+                    separator = ' ';
+                }
+                
+                // 檢查是否需要根據字數自動換行
+                const currentLineStart = textBefore.lastIndexOf('\n') + 1;
+                const currentLineText = textBefore.substring(currentLineStart);
+                if (currentLineText.length + text.length > maxLineLength) {
+                    separator = '\n';
+                    willCreateNewLine = true;
+                    console.log('字數即將超限，預先換行');
+                }
+                
+                // 處理句子分段（保持原有邏輯）
+                const sentences = splitIntoSentences(text);
+                
+                // 將處理後的文字插入到編輯器
+                const newText = sentences.join('\n');
+                editor.value = textBefore + separator + newText + textAfter;
+                
+                // 更新游標位置到插入文字的末尾
+                const newCursorPos = cursorPos + separator.length + newText.length;
+                editor.selectionStart = editor.selectionEnd = newCursorPos;
+
+                // ★ 新增：觸發協作更新
+                scheduleCollaborationUpdate();
+                
+                // 更新行號（使用最終結果更新延遲）
+                setTimeout(() => {
+                    updateLineNumbers();
+                }, finalUpdateDelay);
+                
+                // 語音模式下自動推送當前行
+                if (isRecording) {
+                    if (willCreateNewLine) {
+                        // 如果發生了自動換行，立即推送到新行
+                        console.log('最終結果觸發自動換行，立即推送到新行');
+                        setTimeout(() => {
+                            autoFollowCurrentLine();
+                        }, finalPushDelay);
+                    } else {
+                        // 正常推送
+                        setTimeout(() => {
+                            autoFollowCurrentLine();
+                        }, finalPushDelay);
+                    }
+                }
+                
+                // 設置防抖更新到服務器（使用編輯器更新延遲）
+                setTimeout(() => {
+                    if (editor.value !== localState.raw_text) {
+                        socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                    }
+                }, finalUpdateDelay);
+            }
+            
+            // 語音模式下自動跟隨當前行
+            function autoFollowCurrentLine() {
+                // ★ 新增：檢查投放模式是否為「自動最新行」
+                const broadcastMode = localState.push_settings?.broadcast_mode || 'manual';
+                if (broadcastMode !== 'automatic') {
+                    return; // 若非自動模式，則不執行任何動作
+                }
+
+                // 為了解決競爭問題，我們將文本內容和行號更新合併在一個事件中發送
+                const lineCount = editor.value.split('\n').length;
+                const lastLineIndex = Math.max(0, lineCount - 1);
+                
+                console.log('自動模式：推送至最新行:', lastLineIndex);
+
+                // 只有當計算出的最新行號與本地狀態的當前行號不同時，才發送更新
+                // 我們同時發送最新的文本內容，以確保服務器狀態的原子性更新
+                if (lastLineIndex !== localState.current_index) {
+                    socket.emit('update_index', { 
+                        room: ROOM_ID, 
+                        index: lastLineIndex, 
+                        raw_text: editor.value, // 將最新的文本內容一起發送
+                        ...getPushOptions() 
+                    });
+                }
+            }
+            
+            // 靜默檢測和智能標點 - 使用精細化停頓參數
+            function setupSilenceDetection() {
+                // 清除之前的計時器
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
+                }
+                
+                console.log('設置靜默檢測，當前時間:', Date.now(), '最後語音時間:', lastSpeechTime);
+                
+                // 設置新的計時器，使用更短的檢測間隔
+                silenceTimer = setTimeout(() => {
+                    // 只有在語音識別狀態下才進行靜默檢測
+                    if (!isRecording) {
+                        console.log('語音識別已停止，跳過靜默檢測');
+                        return;
+                    }
+                    
+                    const silenceDuration = Date.now() - lastSpeechTime;
+                    console.log('檢測到靜默:', silenceDuration + 'ms', '閾值: 短=' + shortPauseThreshold + 'ms, 中=' + mediumPauseThreshold + 'ms, 長=' + longPauseThreshold + 'ms');
+                    
+                    if (silenceDuration >= shortPauseThreshold && silenceDuration < mediumPauseThreshold) {
+                        // 短停頓（600-1500ms）：添加逗號
+                        console.log('✓ 短停頓檢測成功，添加逗號');
+                        addSmartPunctuation('，');
+                        return; // 添加標點後停止檢測
+                    } else if (silenceDuration >= mediumPauseThreshold && silenceDuration < longPauseThreshold) {
+                        // 中停頓（1500-3000ms）：添加句號
+                        console.log('✓ 中停頓檢測成功，添加句號');
+                        addSmartPunctuation('。');
+                        return; // 添加標點後停止檢測
+                    } else if (silenceDuration >= longPauseThreshold) {
+                        // 長停頓（3000ms+）：添加句號並換行
+                        console.log('✓ 長停頓檢測成功，添加句號並換行');
+                        addSmartPunctuation('。', true);
+                        return; // 添加標點後停止檢測
+                    } else {
+                        // 還沒達到短停頓閾值，繼續檢測
+                        console.log('未達到停頓閾值，繼續檢測... 當前:', silenceDuration + 'ms');
+                        setupSilenceDetection(); // 遞歸檢測
+                    }
+                }, silenceCheckInterval); // 使用200ms的檢測間隔
+            }
+            
+            // 添加智能標點 - 優化版本，包含多重斷行條件
+            function addSmartPunctuation(punctuation, forceNewline = false) {
+                const cursorPos = editor.selectionStart;
+                const textBefore = editor.value.substring(0, cursorPos);
+                const textAfter = editor.value.substring(cursorPos);
+                
+                // 檢查最後一個字符是否已經是標點符號
+                if (textBefore && !punctuationMarks.test(textBefore.slice(-1))) {
+                    let insertText = punctuation;
+                    let shouldAddNewline = forceNewline;
+                    
+                    // 計算當前行的信息
+                    const currentLineStart = textBefore.lastIndexOf('\n') + 1;
+                    const currentLineText = textBefore.substring(currentLineStart);
+                    const currentLineLength = currentLineText.length;
+                    const currentLineCommas = (currentLineText.match(/，/g) || []).length;
+                    
+                    console.log('當前行狀態:', {
+                        length: currentLineLength,
+                        commas: currentLineCommas,
+                        text: currentLineText.substring(Math.max(0, currentLineText.length - 20))
+                    });
+                    
+                    // 多重斷行條件判斷
+                    if (!shouldAddNewline) {
+                        // 條件1：字數限制 - 單行超過最大字符數
+                        if (currentLineLength >= maxLineLength) {
+                            shouldAddNewline = true;
+                            console.log('字數超限，自動斷行');
+                        }
+                        // 條件2：逗號計數 - 如果是逗號且已有1個逗號
+                        else if (punctuation === '，' && currentLineCommas >= 1) {
+                            shouldAddNewline = true;
+                            console.log('檢測到第二個逗號，自動斷行');
+                        }
+                        // 條件3：句號強制換行
+                        else if (punctuation === '。') {
+                            shouldAddNewline = true;
+                            console.log('句號自動斷行');
+                        }
+                    }
+                    
+                    if (shouldAddNewline) {
+                        insertText += '\n';
+                        commaCount = 0; // 重置逗號計數
+                    } else if (punctuation === '，') {
+                        commaCount++;
+                    }
+                    
+                    editor.value = textBefore + insertText + textAfter;
+                    const newCursorPos = cursorPos + insertText.length;
+                    editor.selectionStart = editor.selectionEnd = newCursorPos;
+
+                    // ★ 新增：觸發協作更新
+                    scheduleCollaborationUpdate();
+                    
+                    console.log('添加智能標點:', insertText.replace('\n', '\\n'));
+                    
+                    // 如果有換行，立即觸發推送到新行
+                    if (shouldAddNewline && isRecording) {
+                        console.log('檢測到換行，立即推送到新行');
+                        setTimeout(() => {
+                            autoFollowCurrentLine();
+                        }, finalPushDelay);
+                    }
+                    // 語音模式下自動推送當前行（使用優化的推送延遲）
+                    else if (isRecording) {
+                        setTimeout(() => {
+                            autoFollowCurrentLine();
+                        }, finalPushDelay);
+                    }
+                    
+                    // 設置防抖更新（使用最終結果延遲）
+                    setTimeout(() => {
+                        scheduleEditorUpdate();
+                    }, finalUpdateDelay);
+                }
+            }
+            
+            // 防抖更新編輯器內容
+            function scheduleEditorUpdate() {
+                // 清除之前的計時器
+                if (editorUpdateTimer) {
+                    clearTimeout(editorUpdateTimer);
+                }
+                
+                // 設置新的計時器
+                editorUpdateTimer = setTimeout(() => {
+                    updateLineNumbers();
+                    if (editor.value !== localState.raw_text) {
+                        socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                    }
+                    
+                    // 設置推送更新的防抖
+                    schedulePushUpdate();
+                }, editorUpdateDebounce);
+            }
+            
+            // 防抖推送更新
+            function schedulePushUpdate() {
+                // 清除之前的計時器
+                if (pushUpdateTimer) {
+                    clearTimeout(pushUpdateTimer);
+                }
+                
+                // 設置新的計時器
+                pushUpdateTimer = setTimeout(() => {
+                    // 推送當前行到觀眾端
+                    const textUpToCursor = editor.value.substring(0, editor.selectionStart);
+                    const lineNumber = textUpToCursor.split('\n').length - 1;
+                    
+                    if (lineNumber !== localState.current_index) {
+                        socket.emit('update_index', { room: ROOM_ID, index: lineNumber, ...getPushOptions() });
+                    }
+                }, 500); // 延遲500ms推送更新
+            }
+            
+            function splitIntoSentences(text) {
+                // 根據標點符號分割句子
+                const sentences = [];
+                let currentSentence = '';
+                
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    currentSentence += char;
+                    
+                    // 如果遇到句子結束標點符號，則分割
+                    if (sentenceEndings.test(char)) {
+                        sentences.push(currentSentence.trim());
+                        currentSentence = '';
+                    }
+                }
+                
+                // 添加最後的句子（如果有的話）
+                if (currentSentence.trim()) {
+                    sentences.push(currentSentence.trim());
+                }
+                
+                return sentences;
+            }
+            
+            function showSpeechStatus(message, type) {
+                console.log('語音識別狀態更新:', message, type);
+                speechStatus.textContent = message;
+                speechStatus.className = 'speech-status ' + type;
+                speechStatus.style.display = 'block';
+                
+                // 錯誤訊息不自動隱藏，成功訊息3秒後隱藏
+                if (type === 'success') {
+                    setTimeout(() => {
+                        if (speechStatus.textContent === message) {
+                            speechStatus.style.display = 'none';
+                        }
+                    }, 3000);
+                }
+            }
+            
+            // 綁定語音識別切換按鈕事件
+            speechToggleBtn.addEventListener('click', () => {
+                if (isRecording) {
+                    console.log('停止語音識別');
+                    stopSpeechRecognition();
+                } else {
+                    console.log('開始語音識別');
+                    startSpeechRecognition();
+                }
+            });
+            
+            // 語言選擇變更時，如果正在錄音則重新啟動
+            speechLangSelect.addEventListener('change', () => {
+                console.log('語言設定變更:', speechLangSelect.value);
+                if (isRecording) {
+                    stopSpeechRecognition();
+                    startSpeechRecognition();
                 }
             });
         });
