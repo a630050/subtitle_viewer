@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>字幕提詞機 - 導播端</title>
+    <title>字幕神器 - 導播端</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=KaiTi&display=swap" rel="stylesheet">
@@ -206,6 +206,33 @@
         .settings-tab.active { background-color: white; border-bottom: 1px solid white; margin-bottom: -1px; font-weight: bold; }
         .settings-panel { display: none; }
         .settings-panel.active { display: block; }
+
+        /* Night Mode Easter Egg */
+        body.night-mode { background-color: #1e1e1e; color: #e0e0e0; }
+        body.night-mode .editor-pane, body.night-mode .main-container { background-color: #1e1e1e; }
+        body.night-mode .control-pane, body.night-mode #bookmark-sidebar, body.night-mode .editor-wrapper, body.night-mode .control-box { background-color: #252526; border-color: #3c3c3c; }
+        body.night-mode #script-editor { background-color: #252526; color: #e0e0e0; }
+        body.night-mode #line-numbers { background-color: #333; color: #858585; border-right-color: #3c3c3c; }
+        body.night-mode .highlight-active { background-color: #007acc !important; color: #fff !important; }
+        body.night-mode .highlight-blank { background-color: #555 !important; color: #fff !important; }
+        body.night-mode h3, body.night-mode h4 { color: #e0e0e0; }
+        body.night-mode button, body.night-mode .fab-menu-item { background-color: #3e3e42; color: #e0e0e0; border: 1px solid #555; }
+        body.night-mode button:hover, body.night-mode .fab-menu-item:hover { background-color: #555; }
+        body.night-mode .speech-btn { background-color: #007acc; color: white; border: none; }
+        body.night-mode .speech-btn:hover { background-color: #005f9e; }
+        body.night-mode .speech-btn.recording { background-color: #c72c41; }
+        body.night-mode select, body.night-mode input[type=text], body.night-mode input[type=number] { background-color: #3c3c3c; color: #e0e0e0; border-color: #555; }
+        body.night-mode #bookmarks-list li { border-bottom-color: #3c3c3c; }
+        body.night-mode #bookmarks-list li:hover { background-color: #3e3e42; }
+        body.night-mode #sidebar-toggle-btn { background-color: #3e3e42; color: #e0e0e0; border-color: #555; }
+        body.night-mode .author-signature { background-color: #252526; color: #858585; border-color: #3c3c3c; cursor: pointer; }
+        body.night-mode #viewer-link-anchor { background-color: #333; color: #8ab4f8; border-color: #555; }
+        body.night-mode #viewer-link-anchor:hover { background-color: #444; }
+        body.night-mode .settings-tab { background-color: #333; border-color: #555; }
+        body.night-mode .settings-tab.active { background-color: #252526; border-bottom-color: #252526; }
+        body.night-mode .modal-content { background-color: #2d2d2d; }
+        body.night-mode .speech-status.error { background-color: #5c2323; color: #ffb1b1; border-color: #8c3333; }
+        body.night-mode .speech-status.success { background-color: #224a22; color: #b3e6b3; border-color: #336633; }
     </style>
 </head>
 <body>
@@ -768,9 +795,12 @@
 
                 if (indexChanged) adjustScroll();
                 
-                const viewerUrl = `${window.location.origin}/viewer/${ROOM_ID}`;
-                viewerLinkAnchor.href = viewerUrl;
-                viewerLinkAnchor.textContent = viewerUrl;
+                // [NEW] 更新觀眾端連結
+                if (localState.viewer_id) {
+                    const viewerUrl = `${window.location.origin}/viewer/${localState.viewer_id}`;
+                    viewerLinkAnchor.href = viewerUrl;
+                    viewerLinkAnchor.textContent = viewerUrl;
+                }
             }
 
             function updateStyles() {
@@ -1742,6 +1772,34 @@
             // Initial UI setup
             updateUI();
             scheduleLineNumberUpdate();
+
+            // Easter Egg: Night Mode Toggle
+            const authorSignature = document.querySelector('.author-signature');
+            if (authorSignature) {
+                authorSignature.style.cursor = 'pointer'; // Make it look clickable
+                authorSignature.title = '切換日夜間模式'; // Add a tooltip
+
+                const applyTheme = (theme) => {
+                    if (theme === 'night') {
+                        document.body.classList.add('night-mode');
+                    } else {
+                        document.body.classList.remove('night-mode');
+                    }
+                }
+
+                authorSignature.addEventListener('click', () => {
+                    const isNightMode = document.body.classList.contains('night-mode');
+                    const newTheme = isNightMode ? 'day' : 'night';
+                    localStorage.setItem('theme', newTheme);
+                    applyTheme(newTheme);
+                });
+
+                // On page load, apply the saved theme
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme) {
+                    applyTheme(savedTheme);
+                }
+            }
         });
     </script>
 </body>
