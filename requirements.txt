@@ -1,5 +1,5 @@
-Flask
-Flask-SocketIO
-gunicorn
+flask
+flask-socketio
 diff-match-patch
+gunicorn
 eventlet
