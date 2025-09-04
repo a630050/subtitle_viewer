@@ -25,14 +25,12 @@
             line-height: 1.4;
             display: flex; /* Kept for horizontal centering */
             flex-direction: column;
-            /* justify-content: center; /* REMOVED: Vertical alignment is now handled by JavaScript */
             overflow: hidden;
         }
         #subtitle-content {
             width: 100%; /* Make the content wrapper full-width */
             box-sizing: border-box;
-            position: relative; /* ADDED: Ensures child offsetTop is relative to this element */
-            /* MODIFIED: Added transform to transition */
+            position: relative; 
             transition: opacity 0.3s ease-in-out, transform 0.3s ease-out;
         }
         #subtitle-content.hidden {
@@ -41,7 +39,6 @@
         #subtitle-content p { margin: 0; }
         #status { position: absolute; top: 10px; left: 10px; font-size: 1.5vmin; color: #555; z-index: 10; }
 
-        /* --- Scroll Mode Styles (Reverted to simple version) --- */
         #subtitle-container.scroll-mode {
             justify-content: flex-start;
             overflow-y: scroll;
@@ -51,15 +48,18 @@
         }
         #subtitle-container.scroll-mode::-webkit-scrollbar { display: none; }
         
-        #subtitle-container .line {
+		#subtitle-container .line {
             margin: 0.1em 0;
             transition: opacity 0.5s ease;
-            opacity: 0.4; /* Default faded state for all non-highlighted lines */
+            opacity: 0.4; 
             width: 100%;
             box-sizing: border-box;
+            font-size: inherit;
+            line-height: inherit;
         }
+		
         #subtitle-container .line.highlight {
-            opacity: 1; /* Highlighted lines are fully opaque */
+            opacity: 1;
         }
 
         .scroll-padding { 
@@ -67,13 +67,11 @@
             flex-shrink: 0; 
         }
 
-        /* --- Modal Styles --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
         .modal-overlay.visible { opacity: 1; visibility: visible; }
         .modal-content { background-color: #fff; padding: 30px; border-radius: 8px; text-align: center; transform: scale(0.9); transition: transform 0.3s; }
         .modal-overlay.visible .modal-content { transform: scale(1); }
 
-        /* --- FAB Styles --- */
         .fab-container { position: fixed; bottom: 25px; right: 25px; z-index: 999; }
         .fab { width: 56px; height: 56px; background-color: #2196F3; color: white; border-radius: 50%; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transition: transform 0.2s; }
         .fab:hover { background-color: #1976D2; }
@@ -84,7 +82,6 @@
         .fab-menu-item:hover { background-color: #f5f5f5; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- ADDED: QR Code Library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
 </head>
 <body>
@@ -93,7 +90,6 @@
         <div id="subtitle-content">等待字幕...</div>
     </div>
 
-    <!-- ADDED: FAB and Menu -->
     <div class="fab-container">
         <div class="fab-menu" id="fab-menu">
             <button class="fab-menu-item" id="qrcode-btn">QRcode</button>
@@ -102,7 +98,6 @@
         <button class="fab" id="fab">+</button>
     </div>
 
-    <!-- ADDED: QR Code Modal -->
     <div id="qrcode-modal" class="modal-overlay">
         <div class="modal-content">
             <h4>觀眾端連結 QR Code</h4>
@@ -120,8 +115,6 @@
             let subtitleContent = document.getElementById('subtitle-content');
             const statusElement = document.getElementById('status');
             const bodyElement = document.body;
-
-            // --- ADDED: New element references ---
             const fab = document.getElementById('fab');
             const fabMenu = document.getElementById('fab-menu');
             const qrcodeBtn = document.getElementById('qrcode-btn');
@@ -135,7 +128,7 @@
             let isScrollModeInitialized = false;
             let lastRawText = "";
             let lastContent = '';
-            let lastStateForReposition = null; // Store state for repositioning on resize
+            let lastStateForReposition = null;
 
             function startHeartbeat() {
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
@@ -168,48 +161,42 @@
             });
             
             socket.on('state_update', (state) => {
-                lastStateForReposition = state; // Cache the latest state
+                lastStateForReposition = state;
                 const pushSettings = state.push_settings || { display_lines: 1, transition_mode: 'fade' };
                 updateStyles(state.style_settings);
 
                 const isScroll = pushSettings.transition_mode === 'scroll' || pushSettings.transition_mode === 'scroll-normal';
 
-                // Reset container if mode changes from scroll to non-scroll
                 if (!isScroll && isScrollModeInitialized) {
                     cleanupScrollContainer();
                     isScrollModeInitialized = false;
                 }
 
                 if (isScroll) {
-                    subtitleContainer.style.justifyContent = 'flex-start'; // Reset for scroll mode
+                    subtitleContainer.style.justifyContent = 'flex-start';
                     if (!isScrollModeInitialized || lastRawText !== state.raw_text) {
                         initializeScrollContainer(state.lines);
                         isScrollModeInitialized = true;
                         lastRawText = state.raw_text;
                     }
-                    // MODIFIED: Pass style_settings to the function
                     updateScrollHighlight(state.current_index, pushSettings.display_lines, pushSettings.transition_mode, state.style_settings);
                 } else {
-                    // --- NEW LOGIC FOR MAIN-LINE CENTERING ---
                     const lines = state.lines || [];
                     const currentIndex = state.current_index || 0;
                     const displayLines = pushSettings.display_lines || 1;
                     const startIndex = Math.max(0, currentIndex - (displayLines - 1));
                     const linesToShow = lines.slice(startIndex, currentIndex + 1);
-
-                    // Create a unique content key to check if DOM update is needed
                     const newContentKey = linesToShow.join('|') + currentIndex;
 
                     if (newContentKey === lastContent) return;
                     lastContent = newContentKey;
 
-                    // Generate HTML with a specific ID for the main line
                     const newHtmlContent = linesToShow.map((line, i) => {
                         const lineIndex = startIndex + i;
                         const isMainLine = (lineIndex === currentIndex);
                         const id = isMainLine ? 'main-line' : '';
-                        const parsedLine = marked.parse(cleanLineForDisplay(line), { gfm: true, breaks: true }).replace(/^<p>|<\/p>$/g, '');
-                        return `<p id="${id}">${parsedLine}</p>`;
+                        const parsedLine = marked.parseInline(cleanLineForDisplay(line), { gfm: true, breaks: true });
+                        return `<p id="${id}">${parsedLine || '&nbsp;'}</p>`;
                     }).join('');
 
                     if (pushSettings.transition_mode === 'fade') {
@@ -218,7 +205,7 @@
                             updateDirectContent(newHtmlContent, state.style_settings, state.current_index);
                             subtitleContent.classList.remove('hidden');
                         }, 150);
-                    } else { // 'direct' mode
+                    } else {
                         updateDirectContent(newHtmlContent, state.style_settings, state.current_index);
                     }
                 }
@@ -231,20 +218,15 @@
             function updateStyles(styles) {
                 if (!styles) return;
                 const REFERENCE_WIDTH = 1920;
-
                 bodyElement.style.backgroundColor = styles.bg_color;
-                
                 const userMargin = styles.margin !== undefined ? styles.margin : 30;
                 const userFontSize = styles.font_size !== undefined ? styles.font_size : 100;
                 const textAlign = styles.text_align || 'left';
                 const viewerWidth = subtitleContainer.clientWidth;
 
-                // The verticalAlign logic is now handled inside updateDirectContent
-
                 if (viewerWidth > 0) {
                     const actualMargin = (userMargin / REFERENCE_WIDTH) * viewerWidth;
                     const textAreaWidth = viewerWidth - (actualMargin * 2);
-                    
                     const referenceTextAreaWidth = REFERENCE_WIDTH - (userMargin * 2);
                     const actualFontSize = (userFontSize / referenceTextAreaWidth) * textAreaWidth;
 
@@ -262,7 +244,7 @@
             }
 
             function initializeScrollContainer(lines) {
-                subtitleContainer.innerHTML = ''; // Clear container
+                subtitleContainer.innerHTML = '';
                 subtitleContainer.classList.add('scroll-mode');
 
                 const topPadding = document.createElement('div');
@@ -273,7 +255,11 @@
                     const p = document.createElement('p');
                     p.id = `line-${index}`;
                     p.className = 'line';
-                    p.innerHTML = cleanLineForDisplay(line).replace(/\n/g, '<br>');
+                    
+                    // ★★★ 最終修正點 ★★★
+                    const cleanedLine = cleanLineForDisplay(line).replace(/\n/g, '<br>');
+                    p.innerHTML = cleanedLine || '&nbsp;'; // 如果行為空，使用 &nbsp;
+                    
                     subtitleContainer.appendChild(p);
                 });
 
@@ -286,24 +272,21 @@
                 subtitleContainer.classList.remove('scroll-mode');
                 subtitleContainer.innerHTML = '<div id="subtitle-content">等待字幕...</div>';
                 subtitleContent = document.getElementById('subtitle-content');
-                subtitleContent.style.transform = 'translateY(0px)'; // Reset transform
+                subtitleContent.style.transform = 'translateY(0px)';
             }
 
             function updateScrollHighlight(currentIndex, displayLines, transitionMode, style_settings) {
                 const startIndex = Math.max(0, currentIndex - (displayLines - 1));
-                
                 document.querySelectorAll('#subtitle-container .line').forEach(el => {
                     const lineIndex = parseInt(el.id.split('-')[1]);
-
                     if (lineIndex > currentIndex) {
                         el.style.opacity = '0';
                     } else if (lineIndex >= startIndex && lineIndex <= currentIndex) {
-                        el.style.opacity = '1'; // Highlighted line
+                        el.style.opacity = '1';
                     } else {
                         el.style.opacity = (transitionMode === 'scroll-normal') ? '1' : '0.4';
                     }
                 });
-
                 const targetEl = document.getElementById(`line-${startIndex}`);
                 if (targetEl) {
                     const verticalAlign = style_settings?.vertical_align || 'center';
@@ -320,47 +303,45 @@
             function updateDirectContent(newHtml, styles, currentIndex) {
                 subtitleContent.innerHTML = newHtml;
 
+                // [MODIFIED] 重置 flexbox 屬性，讓 transform 處理垂直對齊
+                if (!subtitleContainer.classList.contains('scroll-mode')) {
+                    // 重置為預設值，讓 updateDirectContent 中的 transform 處理垂直對齊
+                    subtitleContainer.style.justifyContent = 'flex-start';
+                }
+                
                 requestAnimationFrame(() => {
                     const mainLineElement = document.getElementById('main-line');
                     const verticalAlign = styles?.vertical_align || 'center';
-
                     if (mainLineElement) {
                         const containerHeight = subtitleContainer.clientHeight;
                         const contentHeight = subtitleContent.offsetHeight;
                         const mainLineTop = mainLineElement.offsetTop;
                         const mainLineHeight = mainLineElement.offsetHeight;
-                        
                         let targetY;
                         if (verticalAlign === 'top') {
-                            // 靠上：主行頂部對齊容器頂部
                             targetY = mainLineTop;
                         } else if (verticalAlign === 'bottom') {
-                            // ★ 修正靠下計算：主行底部對齊容器底部
+                            // 修正：讓內容底部對齊容器底部
                             targetY = mainLineTop + mainLineHeight - containerHeight;
-                        } else { // 'center'
-                            // ★ 修正置中計算：主行中心對齊容器中心
+                        } else {
                             const mainLineCenter = mainLineTop + (mainLineHeight / 2);
                             const containerCenter = containerHeight / 2;
                             targetY = mainLineCenter - containerCenter;
                         }
-                        
                         const offset = -targetY;
                         subtitleContent.style.transform = `translateY(${offset}px)`;
-
                     } else if (subtitleContent.firstChild) {
-                        // 處理沒有主行的情況（如強制字幕）
                         const containerHeight = subtitleContainer.clientHeight;
                         const contentHeight = subtitleContent.offsetHeight;
-                        
                         let offset = 0;
                         if (verticalAlign === 'top') {
-                            offset = -subtitleContent.offsetTop;
+                            offset = 0; // 靠上：內容頂部對齊容器頂部
                         } else if (verticalAlign === 'bottom') {
-                            // ★ 修正：確保內容底部對齊容器底部
-                            offset = containerHeight - contentHeight - subtitleContent.offsetTop;
-                        } else { // 'center'
-                            // ★ 修正：確保內容中心對齊容器中心
-                            offset = (containerHeight - contentHeight) / 2 - subtitleContent.offsetTop;
+                            // 修正：確保內容底部對齊容器底部
+                            offset = containerHeight - contentHeight;
+                        } else {
+                            // 置中：內容中心對齊容器中心
+                            offset = (containerHeight - contentHeight) / 2;
                         }
                         subtitleContent.style.transform = `translateY(${offset}px)`;
                     } else {
@@ -375,22 +356,19 @@
                     isScrollModeInitialized = false;
                 }
                 const text = data.text || '';
-                lastContent = text; // Update lastContent to prevent unwanted transitions
-                
+                lastContent = text;
                 const newHtml = marked.parse(text, { gfm: true, breaks: true });
-                // For forced content, we don't have a "main line", so we use the fallback in updateDirectContent
-                updateDirectContent(newHtml, lastStateForReposition?.style_settings || {}, -1);
+                // [FIXED] 使用當前狀態的樣式設定，確保垂直對齊正確應用
+                const currentStyles = lastStateForReposition?.style_settings || {};
+                updateDirectContent(newHtml, currentStyles, lastStateForReposition?.current_index || 0);
             });
 
-            // Recalculate position on window resize
             window.addEventListener('resize', () => {
                 if (lastStateForReposition && !isScrollModeInitialized) {
-                    // Re-trigger the positioning logic with the last known state
                     updateDirectContent(subtitleContent.innerHTML, lastStateForReposition.style_settings, lastStateForReposition.current_index);
                 }
             });
 
-            // --- ADDED: FAB, Modal, and Copy Logic ---
             fab.addEventListener('click', () => {
                 fab.classList.toggle('open');
                 fabMenu.classList.toggle('open');
@@ -399,17 +377,13 @@
             copyBtn.addEventListener('click', () => {
                 fab.classList.remove('open');
                 fabMenu.classList.remove('open');
-
                 if (!lastStateForReposition || !lastStateForReposition.lines) {
                     alert('沒有可複製的文本內容。');
                     return;
                 }
-
-                // Reconstruct the full, clean script text from the stored state
                 const textToCopy = lastStateForReposition.lines
-                    .map(line => line.replace(/^§\s*/, '')) // Also remove bookmark characters
+                    .map(line => line.replace(/^§\s*/, ''))
                     .join('\n');
-                
                 if (navigator.clipboard && textToCopy) {
                     navigator.clipboard.writeText(textToCopy).then(() => {
                         const originalText = copyBtn.textContent;
@@ -455,22 +429,6 @@
             qrcodeModal.addEventListener('click', (e) => {
                 if (e.target === qrcodeModal) closeModal();
             });
-
-        });
-    </script>
-</body>
-</html>;
-            });
-
-            function closeModal() {
-                qrcodeModal.classList.remove('visible');
-            }
-
-            qrcodeCloseBtn.addEventListener('click', closeModal);
-            qrcodeModal.addEventListener('click', (e) => {
-                if (e.target === qrcodeModal) closeModal();
-            });
-
         });
     </script>
 </body>
