@@ -146,7 +146,7 @@
             socket.on('connect', () => { 
                 statusElement.textContent = "已連線"; 
                 statusElement.style.color = '#008000'; 
-                socket.emit('join', { room: ROOM_ID }); 
+                socket.emit('join', { room: ROOM_ID, client_type: 'viewer' }); 
                 startHeartbeat();
             });
             socket.on('disconnect', () => { 
@@ -223,6 +223,7 @@
                 const userMargin = styles.margin !== undefined ? styles.margin : 30;
                 const userFontSize = styles.font_size !== undefined ? styles.font_size : 100;
                 const textAlign = styles.text_align || 'left';
+                const fontVariant = styles.font_variant || 'normal';
                 const viewerWidth = subtitleContainer.clientWidth;
 
                 if (viewerWidth > 0) {
@@ -237,7 +238,9 @@
                         textAlign: textAlign,
                         paddingLeft: `${actualMargin}px`,
                         paddingRight: `${actualMargin}px`,
-                        fontSize: `${actualFontSize}px`
+                        fontSize: `${actualFontSize}px`,
+                        fontWeight: (fontVariant === 'bold') ? 'bold' : 'normal',
+                        fontStyle: (fontVariant === 'italic') ? 'italic' : 'normal'
                     };
                     Object.assign(subtitleContainer.style, containerStyles);
                     subtitleContent.style.textAlign = textAlign;
