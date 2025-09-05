@@ -18,8 +18,8 @@
         
         /* Collapsible Bookmark Sidebar */
         #bookmark-sidebar { 
-            flex: 1; /* Use flex for sizing */
-            min-width: 0; /* Allow shrinking */
+            flex: 0 0 250px; /* Fixed width of 250px */
+            min-width: 0; /* Allow shrinking when collapsed */
             transition: all 0.3s ease;
             display: flex; 
             flex-direction: column; 
@@ -29,20 +29,85 @@
             position: relative; /* 為絕對定位的書籤列表提供定位基準 */
         }
         #bookmark-sidebar.collapsed { flex: 0 0 0px; min-width: 0; padding: 0; border: none; margin-left: -1em; }
-        #bookmark-sidebar h3 { margin-bottom: 10px; white-space: nowrap; }
-        #bookmarks-list { 
-            list-style-type: none; 
-            padding: 0; 
-            overflow-y: scroll; 
-            border-top: 1px solid #eee; 
+        
+        /* Tab Navigation */
+        .sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 0;
+        }
+        .sidebar-tab {
+            flex: 1;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .sidebar-tab.active {
+            background: #fff;
+            border-bottom-color: #007bff;
+            color: #007bff;
+        }
+        .sidebar-tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+        
+        /* Tab Content */
+        .tab-content {
             position: absolute;
-            top: 50px; /* 標題高度 */
+            top: 55px; /* Tab height + margin */
             left: 15px;
             right: 15px;
             bottom: 15px;
+            overflow-y: auto;
+        }
+        .tab-pane {
+            display: none;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        
+        /* Bookmarks Tab */
+        #bookmarks-list { 
+            list-style-type: none; 
+            padding: 0; 
+            margin: 0;
         }
         #bookmarks-list li { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         #bookmarks-list li:hover { background-color: #f5f5f5; }
+        
+        /* Quick Inputs Tab */
+        .quick-inputs-grid {
+            display: grid;
+            gap: 8px;
+        }
+        .quick-input-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .quick-input-label {
+            font-size: 12px;
+            color: #666;
+            min-width: 45px;
+            font-weight: bold;
+        }
+        .quick-input-field {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+        .quick-input-field:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
         .author-signature { 
             margin-left: 15px; 
             padding: 5px 10px; 
@@ -58,7 +123,7 @@
         }
 
         /* Editor Area */
-        .editor-wrapper { position: relative; flex: 3; /* Use flex for sizing */ border: 1px solid #ccc; border-radius: 4px; background-color: #fff; height: 100%; }
+        .editor-wrapper { position: relative; flex: 1; /* Fill remaining space */ border: 1px solid #ccc; border-radius: 4px; background-color: #fff; height: 100%; }
         #sidebar-toggle-btn { 
             position: absolute; 
             top: 50%; 
@@ -290,14 +355,69 @@
 			
             <div class="editor-area">
                 <div id="bookmark-sidebar" class="control-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h3 style="margin: 0;">書籤列表</h3>
-                        <div>
-                            <button id="goto-first-line-btn" style="padding: 2px 8px; font-size: 12px; cursor: pointer;">至首行</button>
-                            <button id="goto-last-line-btn" style="padding: 2px 8px; font-size: 12px; cursor: pointer; margin-left: 5px;">至末行</button>
+                    <!-- Tab Navigation -->
+                    <div class="sidebar-tabs">
+                        <button class="sidebar-tab active" data-tab="bookmarks">書籤</button>
+                        <button class="sidebar-tab" data-tab="quick-inputs">快捷輸入</button>
+                    </div>
+                    
+                    <!-- Tab Content -->
+                    <div class="tab-content">
+                        <!-- Bookmarks Tab -->
+                        <div id="bookmarks-tab" class="tab-pane active">
+                            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px; margin-top: 10px;">
+                                <button id="goto-first-line-btn" style="padding: 4px 12px; font-size: 12px; cursor: pointer;">至首行</button>
+                                <button id="goto-last-line-btn" style="padding: 4px 12px; font-size: 12px; cursor: pointer; margin-left: 8px;">至末行</button>
+                            </div>
+                            <ul id="bookmarks-list"></ul>
+                        </div>
+                        
+                        <!-- Quick Inputs Tab -->
+                        <div id="quick-inputs-tab" class="tab-pane">
+                            <div class="quick-inputs-grid" style="margin-top: 10px;">
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+1</span>
+                                    <input type="text" class="quick-input-field" data-key="1" placeholder="快捷輸入 1">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+2</span>
+                                    <input type="text" class="quick-input-field" data-key="2" placeholder="快捷輸入 2">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+3</span>
+                                    <input type="text" class="quick-input-field" data-key="3" placeholder="快捷輸入 3">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+4</span>
+                                    <input type="text" class="quick-input-field" data-key="4" placeholder="快捷輸入 4">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+5</span>
+                                    <input type="text" class="quick-input-field" data-key="5" placeholder="快捷輸入 5">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+6</span>
+                                    <input type="text" class="quick-input-field" data-key="6" placeholder="快捷輸入 6">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+7</span>
+                                    <input type="text" class="quick-input-field" data-key="7" placeholder="快捷輸入 7">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+8</span>
+                                    <input type="text" class="quick-input-field" data-key="8" placeholder="快捷輸入 8">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+9</span>
+                                    <input type="text" class="quick-input-field" data-key="9" placeholder="快捷輸入 9">
+                                </div>
+                                <div class="quick-input-item">
+                                    <span class="quick-input-label">Ctrl+0</span>
+                                    <input type="text" class="quick-input-field" data-key="10" placeholder="快捷輸入 10">
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <ul id="bookmarks-list"></ul>
                 </div>
                 <div class="editor-wrapper">
                     <div id="sidebar-toggle-btn">&laquo;</div>
@@ -585,6 +705,108 @@
             let maxLineLength = 30;
             let updateTimeout = null;
             let resizeTimeout = null;
+            
+            // 快捷輸入功能
+            let quickInputs = {};
+            let isEditing = false;
+            
+            // 初始化分頁切換功能
+            function initSidebarTabs() {
+                const tabs = document.querySelectorAll('.sidebar-tab');
+                const panes = document.querySelectorAll('.tab-pane');
+                
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        // 移除所有活動狀態
+                        tabs.forEach(t => t.classList.remove('active'));
+                        panes.forEach(p => p.classList.remove('active'));
+                        
+                        // 設置新的活動狀態
+                        tab.classList.add('active');
+                        const targetTab = tab.getAttribute('data-tab');
+                        document.getElementById(targetTab + '-tab').classList.add('active');
+                    });
+                });
+            }
+            
+            // 初始化快捷輸入功能
+            function initQuickInputs() {
+                const quickInputFields = document.querySelectorAll('.quick-input-field');
+                
+                // 監聽輸入框變化
+                quickInputFields.forEach(field => {
+                    field.addEventListener('input', () => {
+                        const key = field.getAttribute('data-key');
+                        quickInputs[key] = field.value;
+                        
+                        // 發送到服務器
+                        socket.emit('update_quick_inputs', {
+                            room: ROOM_ID,
+                            inputs: quickInputs
+                        });
+                    });
+                });
+                
+                // 監聽快捷鍵
+                document.addEventListener('keydown', (e) => {
+                    // 只在編輯模式下且按下 Ctrl 鍵時處理
+                    if (!isEditing || !e.ctrlKey) return;
+                    
+                    let keyNumber = null;
+                    if (e.key >= '1' && e.key <= '9') {
+                        keyNumber = e.key;
+                    } else if (e.key === '0') {
+                        keyNumber = '10';
+                    }
+                    
+                    // 如果是我們定義的快捷鍵範圍，無論是否有內容都要阻止默認行為
+                    if (keyNumber) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // 只有當快捷輸入有內容時才插入文字
+                        if (quickInputs[keyNumber] && quickInputs[keyNumber].trim() !== '') {
+                            insertTextAtCursor(quickInputs[keyNumber]);
+                        }
+                        // 如果沒有內容，什麼都不做，但已經阻止了默認行為
+                    }
+                });
+            }
+            
+            // 在游標位置插入文字
+            function insertTextAtCursor(text) {
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const currentValue = editor.value;
+                
+                editor.value = currentValue.substring(0, start) + text + currentValue.substring(end);
+                editor.selectionStart = editor.selectionEnd = start + text.length;
+                
+                // 觸發編輯器更新
+                handleEditorChange();
+            }
+            
+            // 更新快捷輸入字段顯示
+            function updateQuickInputFields() {
+                const quickInputFields = document.querySelectorAll('.quick-input-field');
+                quickInputFields.forEach(field => {
+                    const key = field.getAttribute('data-key');
+                    if (quickInputs[key]) {
+                        field.value = quickInputs[key];
+                    }
+                });
+            }
+            
+            // 編輯器焦點事件處理
+            function setupEditorEvents() {
+                editor.addEventListener('focus', () => {
+                    isEditing = true;
+                });
+                
+                editor.addEventListener('blur', () => {
+                    isEditing = false;
+                });
+            }
 
             class LineHeightCalculator {
                 constructor(editor, measureDiv) {
@@ -640,6 +862,9 @@
                 statusDiv.textContent = '已連線 ✅'; 
                 socket.emit('join', { room: ROOM_ID, client_type: 'director' }); 
                 startHeartbeat();
+                initSidebarTabs();
+                initQuickInputs();
+                setupEditorEvents();
             });
             socket.on('disconnect', () => { 
                 statusDiv.textContent = '連線中斷 ❌'; 
@@ -652,6 +877,12 @@
                 const oldRawText = localState.raw_text;
                 
                 localState = newState;
+                
+                // 更新快捷輸入數據
+                if (newState.quick_inputs) {
+                    quickInputs = newState.quick_inputs;
+                    updateQuickInputFields();
+                }
                 
                 // [MODIFIED] 初始化或重置用於 patch 的文本
                 lastSentText = newState.raw_text;
