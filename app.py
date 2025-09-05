@@ -30,6 +30,7 @@ class ScriptManager:
         self.current_index = 0
         self.style_settings = { 'font_size': 100, 'fg_color': '#FFFF00', 'bg_color': '#000000', 'font_family': "'Microsoft JhengHei', '蘋方-繁', sans-serif", 'text_align': 'left', 'margin': 100, 'vertical_align': 'center', 'font_variant': 'normal' }
         self.push_settings = { 'display_lines': 1, 'transition_mode': 'direct', 'broadcast_mode': 'manual' }
+        self.quick_inputs = {str(i): '' for i in range(1, 11)}  # 快捷輸入：1-10 格
         self.parse_raw_text()
 
     def parse_raw_text(self):
@@ -42,7 +43,7 @@ class ScriptManager:
         if self.current_index >= len(self.lines): self.current_index = max(0, len(self.lines) - 1)
 
     def get_full_state(self):
-        return { 'raw_text': self.raw_text, 'lines': self.lines, 'bookmarks': self.bookmarks, 'current_index': self.current_index, 'style_settings': self.style_settings, 'push_settings': self.push_settings }
+        return { 'raw_text': self.raw_text, 'lines': self.lines, 'bookmarks': self.bookmarks, 'current_index': self.current_index, 'style_settings': self.style_settings, 'push_settings': self.push_settings, 'quick_inputs': self.quick_inputs }
 
     def update_script(self, new_raw_text): self.raw_text = new_raw_text; self.parse_raw_text()
     def set_index(self, new_index):
@@ -60,6 +61,12 @@ class ScriptManager:
             self.push_settings['transition_mode'] = new_settings['transition_mode']
         if 'broadcast_mode' in new_settings and new_settings['broadcast_mode'] in ['manual', 'automatic', 'follow_cursor']:
             self.push_settings['broadcast_mode'] = new_settings['broadcast_mode']
+
+    def update_quick_inputs(self, new_inputs):
+        """更新快捷輸入設定"""
+        for key, value in new_inputs.items():
+            if key in self.quick_inputs:
+                self.quick_inputs[key] = str(value)
 
     def patch_script(self, patch_text):
         """應用補丁來更新 raw_text"""
@@ -248,6 +255,18 @@ def handle_push_settings_update(data):
     manager = get_room_manager(room_id)
     if manager:
         manager.update_push_settings(data.get('settings', {}))
+        state = manager.get_full_state()
+        with lock:
+            state['viewer_id'] = rooms[room_id]['viewer_id']
+        emit('state_update', state, to=room_id)
+        update_last_active(room_id)
+
+@socketio.on('update_quick_inputs')
+def handle_quick_inputs_update(data):
+    room_id = data.get('room')
+    manager = get_room_manager(room_id)
+    if manager:
+        manager.update_quick_inputs(data.get('inputs', {}))
         state = manager.get_full_state()
         with lock:
             state['viewer_id'] = rooms[room_id]['viewer_id']
