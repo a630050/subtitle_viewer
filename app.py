@@ -28,7 +28,7 @@ class ScriptManager:
         self.lines = []
         self.bookmarks = {}
         self.current_index = 0
-        self.style_settings = { 'font_size': 100, 'fg_color': '#FFFF00', 'bg_color': '#000000', 'font_family': "'Microsoft JhengHei', '蘋方-繁', sans-serif", 'text_align': 'left', 'margin': 100, 'vertical_align': 'center' }
+        self.style_settings = { 'font_size': 100, 'fg_color': '#FFFF00', 'bg_color': '#000000', 'font_family': "'Microsoft JhengHei', '蘋方-繁', sans-serif", 'text_align': 'left', 'margin': 100, 'vertical_align': 'center', 'font_variant': 'normal' }
         self.push_settings = { 'display_lines': 1, 'transition_mode': 'direct', 'broadcast_mode': 'manual' }
         self.parse_raw_text()
 
@@ -100,7 +100,9 @@ def new_room():
         rooms[director_id] = {
             'manager': ScriptManager(),
             'viewer_id': viewer_id,
-            'last_active': datetime.datetime.now()
+            'last_active': datetime.datetime.now(),
+            'directors': set(),
+            'viewers': set()
         }
         viewer_to_director[viewer_id] = director_id
     
@@ -141,12 +143,34 @@ def update_last_active(room_id):
         if room_id in rooms:
             rooms[room_id]['last_active'] = datetime.datetime.now()
 
+def broadcast_connection_counts(room_id):
+    """廣播連線數量給房間內的所有客戶端"""
+    with lock:
+        if room_id in rooms:
+            director_count = len(rooms[room_id].get('directors', []))
+            viewer_count = len(rooms[room_id].get('viewers', []))
+            socketio.emit('connection_update', {
+                'directors': director_count,
+                'viewers': viewer_count
+            }, to=room_id)
+
 @socketio.on('join')
 def on_join(data):
-    room_id = data['room']
-    if room_id in rooms:
+    room_id = data.get('room')
+    client_type = data.get('client_type', 'viewer') # 預設為 viewer
+    sid = request.sid
+
+    if room_id and room_id in rooms:
         join_room(room_id)
-        print(f"客戶端 {request.sid} 已加入房間 {room_id}")
+        with lock:
+            if client_type == 'director':
+                rooms[room_id]['directors'].add(sid)
+            else:
+                rooms[room_id]['viewers'].add(sid)
+        
+        print(f"客戶端 {sid} ({client_type}) 已加入房間 {room_id}")
+        broadcast_connection_counts(room_id) # 廣播更新後的連線數
+
         manager = get_room_manager(room_id)
         if manager:
             # [NEW] 在狀態中加入 viewer_id，讓導播端知道觀眾端連結
@@ -261,7 +285,23 @@ def handle_ping(data):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print(f"客戶端已離線: {request.sid}")
+    sid = request.sid
+    print(f"客戶端已離線: {sid}")
+    room_to_update = None
+    with lock:
+        # 這邊需要遍歷房間來找到離線的客戶端
+        for room_id, data in rooms.items():
+            if sid in data.get('directors', set()):
+                data['directors'].remove(sid)
+                room_to_update = room_id
+                break
+            elif sid in data.get('viewers', set()):
+                data['viewers'].remove(sid)
+                room_to_update = room_id
+                break
+    
+    if room_to_update:
+        broadcast_connection_counts(room_to_update)
 
 # -------------------- 
 # 房間清理機制 [MODIFIED]
