@@ -141,7 +141,30 @@
         }
 
         /* Right Pane: Controls */
-        .control-pane { flex: 1; border-left: 1px solid #ccc; background-color: #fff; padding: 1em; display: flex; flex-direction: column; overflow-y: auto; }
+        .control-pane { flex: 1; border-left: 1px solid #ccc; background-color: #fff; padding: 1em; display: flex; flex-direction: column; overflow-y: auto; position: relative; transition: all 0.3s ease; }
+                .control-pane.collapsed { flex: 0 0 0px; min-width: 0; padding: 0; border-left: none; overflow: hidden; }
+
+        #right-sidebar-toggle-btn { 
+            position: absolute; 
+            top: 50%; 
+            right: -1px; 
+            transform: translateY(-50%) scaleX(1);
+            width: 18px; height: 60px; 
+            background-color: #e0e0e0; 
+            color: #555;
+            border: 1px solid #ccc; 
+            cursor: pointer; 
+            z-index: 10;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 1.2em;
+            border-radius: 0 8px 8px 0; 
+            user-select: none; 
+        }
+        #right-sidebar-toggle-btn.collapsed { 
+            transform: translateY(-50%) scaleX(-1);
+        }
         .control-box { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
         .control-box h3 { margin-top: 0; font-size: 1.1em; font-weight: bold; }
         
@@ -224,7 +247,7 @@
         body.night-mode select, body.night-mode input[type=text], body.night-mode input[type=number] { background-color: #3c3c3c; color: #e0e0e0; border-color: #555; }
         body.night-mode #bookmarks-list li { border-bottom-color: #3c3c3c; }
         body.night-mode #bookmarks-list li:hover { background-color: #3e3e42; }
-        body.night-mode #sidebar-toggle-btn { background-color: #3e3e42; color: #e0e0e0; border-color: #555; }
+        body.night-mode #sidebar-toggle-btn, body.night-mode #right-sidebar-toggle-btn { background-color: #3e3e42; color: #e0e0e0; border-color: #555; }
         body.night-mode .author-signature { background-color: #252526; color: #858585; border-color: #3c3c3c; cursor: pointer; }
         body.night-mode #viewer-link-anchor { background-color: #333; color: #8ab4f8; border-color: #555; }
         body.night-mode #viewer-link-anchor:hover { background-color: #444; }
@@ -254,6 +277,7 @@
                     <button id="import-btn">匯入文本</button>
                     <button id="export-btn">匯出文本</button>
                     <button id="clear-btn">清除文本</button>
+                    <button id="replace-words-btn">置換詞彙</button>
                     <button id="leave-room-btn">離開房間</button>
 
                     <div class="author-signature">程式作者：徐承佑</div>
@@ -269,14 +293,15 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h3 style="margin: 0;">書籤列表</h3>
                         <div>
-                            <button id="goto-first-line-btn" style="padding: 2px 8px; font-size: 12px; cursor: pointer;">首行</button>
-                            <button id="goto-last-line-btn" style="padding: 2px 8px; font-size: 12px; cursor: pointer; margin-left: 5px;">末行</button>
+                            <button id="goto-first-line-btn" style="padding: 2px 8px; font-size: 12px; cursor: pointer;">至首行</button>
+                            <button id="goto-last-line-btn" style="padding: 2px 8px; font-size: 12px; cursor: pointer; margin-left: 5px;">至末行</button>
                         </div>
                     </div>
                     <ul id="bookmarks-list"></ul>
                 </div>
                 <div class="editor-wrapper">
                     <div id="sidebar-toggle-btn">&laquo;</div>
+                    <div id="right-sidebar-toggle-btn">&raquo;</div>
                     <div id="line-numbers"></div>
                     <div id="line-measure" style="position: absolute; top: -9999px; left: 0; visibility: hidden; white-space: pre-wrap; word-wrap: break-word;"></div>
                     <textarea id="script-editor" placeholder="在此輸入或貼上文本..." wrap="soft"></textarea>
@@ -317,6 +342,14 @@
 				<div class="style-control">
 					<label for="font-size-input">字體大小 (px)</label>
 					<input type="number" id="font-size-input" min="10" max="200" step="2">
+				</div>
+				<div class="style-control">
+					<label for="font-variant-select">字樣</label>
+					<select id="font-variant-select">
+						<option value="normal" selected>正常</option>
+						<option value="bold">粗體</option>
+						<option value="italic">斜體</option>
+					</select>
 				</div>
 				<div class="style-control">
 					<label for="fg-color-input">字體顏色</label>
@@ -413,6 +446,24 @@
         </div>
     </div>
 
+    <div id="replace-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h4 style="margin-top: 0;">置換詞彙</h4>
+            <div class="replace-control" style="margin: 15px 0; text-align: left;">
+                <label for="find-input" style="display: block; margin-bottom: 5px;">尋找目標：</label>
+                <input type="text" id="find-input" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div class="replace-control" style="margin: 15px 0; text-align: left;">
+                <label for="replace-input" style="display: block; margin-bottom: 5px;">置換為：</label>
+                <input type="text" id="replace-input" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+                 <button id="replace-cancel-btn" style="padding: 4px 8px; font-size: 14px; cursor: pointer;">取消</button>
+                 <button id="replace-all-btn" style="padding: 4px 8px; font-size: 14px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px;">全部置換</button>
+            </div>
+        </div>
+    </div>
+
 
     
     <div id="qrcode-modal" class="modal-overlay" style="display: none;">
@@ -436,7 +487,9 @@
             const socket = io();
             const ROOM_ID = "{{ room_id }}";
 
-            const editor = document.getElementById('script-editor'),
+            const controlPane = document.querySelector('.control-pane'),
+                  rightSidebarToggleBtn = document.getElementById('right-sidebar-toggle-btn'),
+                  editor = document.getElementById('script-editor'),
                   lineNumbersDiv = document.getElementById('line-numbers'),
                   lineMeasure = document.getElementById('line-measure'),
                   statusDiv = document.getElementById('status'),
@@ -447,6 +500,7 @@
                   importBtn = document.getElementById('import-btn'),
                   exportBtn = document.getElementById('export-btn'),
                   fileInput = document.getElementById('file-input'),
+                  fontVariantSelect = document.getElementById('font-variant-select'),
                   fontSizeInput = document.getElementById('font-size-input'),
                   fgColorInput = document.getElementById('fg-color-input'),
                   bgColorInput = document.getElementById('bg-color-input'),
@@ -461,6 +515,12 @@
                   importRawBtn = document.getElementById('import-raw-btn'),
                   importSmartBtn = document.getElementById('import-smart-btn'),
                   importCancelBtn = document.getElementById('import-cancel-btn'),
+                  replaceWordsBtn = document.getElementById('replace-words-btn'),
+                  replaceModal = document.getElementById('replace-modal'),
+                  findInput = document.getElementById('find-input'),
+                  replaceInput = document.getElementById('replace-input'),
+                  replaceAllBtn = document.getElementById('replace-all-btn'),
+                  replaceCancelBtn = document.getElementById('replace-cancel-btn'),
                   bookmarkSidebar = document.getElementById('bookmark-sidebar'),				  
                   sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'),
 				  viewerLinkAnchor = document.getElementById('viewer-link-anchor'),                                    
@@ -561,13 +621,29 @@
                 }
             }
 
+            let latency = 0;
+            let connectionCounts = null;
+
+            function updateStatusDisplay() {
+                if (socket.connected) {
+                    let statusText = `已連線 ✅ (${latency}ms)`;
+                    if (connectionCounts) {
+                        statusText += ` / 導播端 ${connectionCounts.directors}人 / 觀眾端 ${connectionCounts.viewers}人`;
+                    }
+                    statusDiv.textContent = statusText;
+                } else {
+                    statusDiv.textContent = '連線中斷 ❌';
+                }
+            }
+
             socket.on('connect', () => { 
                 statusDiv.textContent = '已連線 ✅'; 
-                socket.emit('join', { room: ROOM_ID }); 
+                socket.emit('join', { room: ROOM_ID, client_type: 'director' }); 
                 startHeartbeat();
             });
             socket.on('disconnect', () => { 
                 statusDiv.textContent = '連線中斷 ❌'; 
+                connectionCounts = null;
                 stopHeartbeat();
             });
             socket.on('state_update', (newState) => { 
@@ -587,8 +663,14 @@
             });
             socket.on('pong', (data) => { 
                 lastPongTime = Date.now();
-                const latency = lastPongTime - data.timestamp;
-                statusDiv.textContent = `已連線 ✅ (${latency}ms)`;
+                latency = lastPongTime - data.timestamp;
+                updateStatusDisplay();
+            });
+
+            // [NEW] 監聽連線數更新
+            socket.on('connection_update', (counts) => {
+                connectionCounts = counts;
+                updateStatusDisplay();
             });
 
             // [NEW] 監聽來自伺服器的文本補丁
@@ -814,11 +896,14 @@
                 const verticalAlign = styles.vertical_align || 'center';
                 const userMargin = styles.margin !== undefined ? styles.margin : 30;
                 const userFontSize = styles.font_size !== undefined ? styles.font_size : 100;
+                const fontVariant = styles.font_variant || 'normal';
 
                 currentSubtitleContainer.style.backgroundColor = bgColor;
                 currentSubtitleContainer.style.color = fgColor;
                 currentSubtitleContainer.style.fontFamily = fontFamily;
                 currentSubtitleContainer.style.textAlign = textAlign;
+                currentSubtitleContainer.style.fontWeight = (fontVariant === 'bold') ? 'bold' : 'normal';
+                currentSubtitleContainer.style.fontStyle = (fontVariant === 'italic') ? 'italic' : 'normal';
                 currentSubtitleContainer.style.boxSizing = 'border-box';
 
                 if (verticalAlign === 'top') {
@@ -848,6 +933,7 @@
                 if (document.activeElement !== textAlignSelect) textAlignSelect.value = textAlign;
                 if (document.activeElement !== verticalAlignSelect) verticalAlignSelect.value = styles.vertical_align || 'center';
                 if (document.activeElement !== marginInput) marginInput.value = userMargin;
+                if (document.activeElement !== fontVariantSelect) fontVariantSelect.value = styles.font_variant || 'normal';
                 
                 compensateForScrollbars();
             }
@@ -958,7 +1044,19 @@
 
             sidebarToggleBtn.addEventListener('click', () => {
                 bookmarkSidebar.classList.toggle('collapsed');
-                setTimeout(scheduleLineNumberUpdate, 300);
+                setTimeout(() => {
+                    scheduleLineNumberUpdate();
+                    updateStyles();
+                }, 300);
+            });
+
+            rightSidebarToggleBtn.addEventListener('click', () => {
+                controlPane.classList.toggle('collapsed');
+                rightSidebarToggleBtn.classList.toggle('collapsed');
+                setTimeout(() => {
+                    scheduleLineNumberUpdate();
+                    updateStyles();
+                }, 300);
             });
 
             function toggleBookmark(index) {
@@ -1046,6 +1144,17 @@
                         let splitPos = -1;
                         for (let i = MAX_LEN; i >= 0; i--) {
                             if (i < currentLine.length && punctuation.test(currentLine[i])) {
+                                // If the split point is a space, check if it's adjacent to a digit.
+                                if (/\s/.test(currentLine[i])) {
+                                    // Check if preceded by a digit
+                                    if (i > 0 && /[0-9]/.test(currentLine[i - 1])) {
+                                        continue; // e.g., "2020 年" -> ignore space after "2020"
+                                    }
+                                    // Check if followed by a digit
+                                    if (i < currentLine.length - 1 && /[0-9]/.test(currentLine[i + 1])) {
+                                        continue; // e.g., "於 2020" -> ignore space before "2020"
+                                    }
+                                }
                                 splitPos = i;
                                 break;
                             }
@@ -1054,8 +1163,8 @@
                             newLines.push(currentLine.substring(0, splitPos + 1).trim());
                             currentLine = currentLine.substring(splitPos + 1).trim();
                         } else {
-                            newLines.push(currentLine.substring(0, MAX_LEN));
-                            currentLine = currentLine.substring(MAX_LEN).trim();
+                            // No suitable punctuation found, so we keep the line as is and break the loop.
+                            break;
                         }
                     }
                     if (currentLine.length > 0) newLines.push(currentLine);
@@ -1109,6 +1218,55 @@
                 importModal.style.display = 'none';
             });
 
+            replaceWordsBtn.addEventListener('click', () => { 
+                replaceModal.style.display = 'flex';
+                findInput.value = '';
+                replaceInput.value = '';
+                findInput.focus();
+            });
+
+            replaceCancelBtn.addEventListener('click', () => { 
+                replaceModal.style.display = 'none';
+            });
+
+            replaceAllBtn.addEventListener('click', () => { 
+                const findText = findInput.value;
+                const replaceText = replaceInput.value;
+
+                if (!findText) {
+                    alert('請輸入要尋找的詞彙。');
+                    return;
+                }
+
+                const confirmation = window.confirm(`您確定要將所有的 "${findText}" 置換為 "${replaceText}" 嗎？\n\n此操作無法復原。`);
+
+                if (confirmation) {
+                    const originalText = editor.value;
+                    const newText = originalText.split(findText).join(replaceText);
+
+                    if (originalText !== newText) {
+                        editor.value = newText;
+                        
+                        if (dmp) {
+                            const patch_text = dmp.patch_toText(dmp.patch_make(originalText, newText));
+                            if (patch_text) {
+                                socket.emit('patch_script', {
+                                    room: ROOM_ID,
+                                    patch: patch_text
+                                });
+                            }
+                        } else {
+                            socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
+                        }
+                        
+                        lastSentText = newText; 
+                        scheduleLineNumberUpdate();
+                    }
+                    
+                    replaceModal.style.display = 'none';
+                }
+            });
+
             saveConfigBtn.addEventListener('click', () => {
                 const config = localState.style_settings;
                 const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -1147,7 +1305,8 @@
                     font_family: fontFamilySelect.value,
                     text_align: textAlignSelect.value,
                     vertical_align: verticalAlignSelect.value,
-                    margin: parseInt(marginInput.value) || 15
+                    margin: parseInt(marginInput.value) || 15,
+                    font_variant: fontVariantSelect.value
                 };
                 socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
                 Object.assign(localState.style_settings, newStyles);
@@ -1163,7 +1322,7 @@
                 }
             }
             [fontSizeInput, fgColorInput, bgColorInput, marginInput].forEach(el => el.addEventListener('input', handleStyleChange));
-            [fontFamilySelect, textAlignSelect, verticalAlignSelect].forEach(el => el.addEventListener('change', handleStyleChange));
+            [fontFamilySelect, textAlignSelect, verticalAlignSelect, fontVariantSelect].forEach(el => el.addEventListener('change', handleStyleChange));
 
 
             function handlePushSettingsChange() {
