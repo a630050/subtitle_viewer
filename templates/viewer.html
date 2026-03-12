@@ -1,439 +1,396 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>字幕神器</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=KaiTi&display=swap" rel="stylesheet">
-    <style>
-        html, body { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%; 
-            height: 100%; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; 
-            overflow: hidden;
-            transition: background-color 0.3s; 
-        }
-        #subtitle-container {
-            width: 100%;
-            height: 100vh;
-            box-sizing: border-box;
-            
-            line-height: 1.4;
-            display: flex; /* Kept for horizontal centering */
-            flex-direction: column;
-            overflow: hidden;
-        }
-        #subtitle-content {
-            width: 100%; /* Make the content wrapper full-width */
-            box-sizing: border-box;
-            position: relative; 
-            transition: opacity 0.3s ease-in-out, transform 0.3s ease-out;
-        }
-        #subtitle-content.hidden {
-            opacity: 0;
-        }
-        #subtitle-content p { margin: 0; }
-        #status { position: absolute; top: 10px; left: 10px; font-size: 1.5vmin; color: #555; z-index: 10; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>觀眾視窗</title>
+  <!-- 引入 QRCode.js 函式庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    html, body { height: 100%; margin: 0; scroll-behavior: smooth; }
+    body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; overflow-y: auto; }
+    .viewer-container { box-sizing: border-box; padding: 0; width: 100%; min-height: 100%; display: block; }
+    .viewer-text {
+      box-sizing: border-box; 
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      width: 100%;
+      max-width: none;
+      padding: 40px;
+      font-size: 40px;
+      line-height: 1.4;
+      color: #fff;
+    }
+    .scroll-to-bottom-btn {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        transition: opacity 0.2s, transform 0.2s;
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+    }
+    .scroll-to-bottom-btn.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+    .scroll-to-bottom-btn:hover {
+        background-color: rgba(255, 255, 255, 0.4);
+    }
+    .scroll-to-bottom-btn svg {
+        width: 24px;
+        height: 24px;
+        stroke: #fff;
+    }
+    .scroll-to-bottom-btn.light-mode-fab {
+        background-color: rgba(0, 0, 0, 0.5); /* 改為半透明黑色背景 */
+        color: white; /* 確保 SVG 顏色繼承為白色 */
+        border: none; /* 移除邊框 */
+    }
+    .scroll-to-bottom-btn.light-mode-fab:hover {
+        background-color: rgba(0, 0, 0, 0.7); /* 滑鼠懸停時加深顏色 */
+    }
+    .scroll-to-bottom-btn.light-mode-fab svg {
+        stroke: white; /* 明確指定 SVG 線條顏色為白色 */
+    }	
+    
+    /* --- 新增：FAB (浮動操作按鈕) 樣式 --- */
+	.fab-container {
+        position: fixed;
+        top: 10px; /* 改為 top */
+        right: 10px; /* 改為 right */
+        z-index: 100;
+        display: flex;
+        flex-direction: column; /* 改為 column，讓選單向下展開 */
+        align-items: flex-end; /* 改為 flex-end 讓選單靠右對齊 */
+    }
+    #fab-menu {
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: flex-end;
+        margin-bottom: 8px;
+        transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+        opacity: 0;
+        transform: translateY(-10px);
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .fab-container.active #fab-menu {
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+        pointer-events: auto;
+    }
+    .fab-option {
+        display: flex;
+        align-items: center;
+        background-color: rgba(255, 255, 255, 0.9);
+        color: #333;
+        border: none;
+        border-radius: 20px;
+        padding: 6px 14px;
+        margin-bottom: 0px;
+		margin-top: 8px; /* 改回頂部邊距 */
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        white-space: nowrap;
+    }
+    #fab-toggle-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background-color: #0d6efd;
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        line-height: 1;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3); /* 陰影略微縮小 */
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out, background-color 0.2s;
+    }
+    #fab-toggle-btn:hover {
+        background-color: #0b5ed7;
+    }
+    .fab-container.active #fab-toggle-btn {
+        transform: rotate(45deg);
+    }
 
-        #subtitle-container.scroll-mode {
-            justify-content: flex-start;
-            overflow-y: scroll;
-            scroll-behavior: smooth;
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        #subtitle-container.scroll-mode::-webkit-scrollbar { display: none; }
-        
-		#subtitle-container .line {
-            margin: 0.1em 0;
-            transition: opacity 0.5s ease;
-            opacity: 0.4; 
-            width: 100%;
-            box-sizing: border-box;
-            font-size: inherit;
-            line-height: inherit;
-        }
-		
-        #subtitle-container .line.highlight {
-            opacity: 1;
-        }
-
-        .scroll-padding { 
-            height: 50vh; 
-            flex-shrink: 0; 
-        }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
-        .modal-overlay.visible { opacity: 1; visibility: visible; }
-        .modal-content { background-color: #fff; padding: 30px; border-radius: 8px; text-align: center; transform: scale(0.9); transition: transform 0.3s; }
-        .modal-overlay.visible .modal-content { transform: scale(1); }
-
-        .fab-container { position: fixed; bottom: 25px; right: 25px; z-index: 999; }
-        .fab { width: 56px; height: 56px; background-color: #2196F3; color: white; border-radius: 50%; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transition: transform 0.2s; }
-        .fab:hover { background-color: #1976D2; }
-        .fab.open { transform: rotate(45deg); }
-        .fab-menu { position: absolute; bottom: 70px; right: 8px; display: flex; flex-direction: column; gap: 10px; opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s, transform 0.2s; transform: translateY(10px); }
-        .fab-menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
-        .fab-menu-item { background-color: #fff; color: #333; border: none; border-radius: 8px; padding: 8px 16px; box-shadow: 0 1px 5px rgba(0,0,0,0.2); cursor: pointer; font-size: 14px; white-space: nowrap; }
-        .fab-menu-item:hover { background-color: #f5f5f5; }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
+    /* --- 新增：QR Code Modal 樣式 --- */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .modal-content {
+        background-color: #fff;
+        padding: 24px;
+        border-radius: 8px;
+        text-align: center;
+        color: #333;
+    }
+    .modal-content h4 {
+        margin-top: 0;
+        margin-bottom: 16px;
+    }
+    #viewer-qrcode-container {
+        width: 200px;
+        height: 200px;
+        margin: 0 auto;
+        padding: 10px;
+        background: white;
+        border: 1px solid #eee;
+    }
+    #viewer-share-close-btn {
+        margin-top: 20px;
+        padding: 8px 16px;
+        font-size: 15px;
+        cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <div id="status">正在連線...</div>
-    <div id="subtitle-container">
-        <div id="subtitle-content">等待字幕...</div>
-    </div>
+  <div class="viewer-container">
+    <div id="viewer-text" class="viewer-text"></div>
+  </div>
 
-    <div class="fab-container">
-        <div class="fab-menu" id="fab-menu">
-            <button class="fab-menu-item" id="qrcode-btn">QRcode</button>
-            <button class="fab-menu-item" id="copy-btn">複製字幕</button>
-        </div>
-        <button class="fab" id="fab">+</button>
-    </div>
+  <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" title="捲動到底部">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </button>
 
-    <div id="qrcode-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h4>觀眾端連結 QR Code</h4>
-            <div id="qrcode-container" style="margin: 20px 0; min-width: 256px; min-height: 256px;"></div>
-            <button id="qrcode-close-btn">關閉</button>
-        </div>
-    </div>
+  <!-- 新增：FAB (浮動操作按鈕) 區塊 -->
+	<div id="fab-container" class="fab-container">
+      <button id="fab-toggle-btn" title="功能選單">+</button>
+      <div id="fab-menu">
+          <button id="fab-copy-btn" class="fab-option">複製所有字幕</button>
+          <button id="fab-qrcode-btn" class="fab-option">QRCode</button>
+      </div>
+	</div>
+  
+  <!-- 新增：QR Code Modal 區塊 -->
+  <div id="viewer-share-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+          <h4>觀眾端連結 QRCode</h4>
+          <div id="viewer-qrcode-container"></div>
+          <button id="viewer-share-close-btn">關閉</button>
+      </div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const socket = io();
-            const ROOM_ID = "{{ room_id }}";  // 這是 director_id，用於 socket 連接
-            const VIEWER_ID = "{{ viewer_id }}";  // 這是 viewer_id，用於識別
-            const subtitleContainer = document.getElementById('subtitle-container');
-            let subtitleContent = document.getElementById('subtitle-content');
-            const statusElement = document.getElementById('status');
-            const bodyElement = document.body;
-            const fab = document.getElementById('fab');
-            const fabMenu = document.getElementById('fab-menu');
-            const qrcodeBtn = document.getElementById('qrcode-btn');
-            const copyBtn = document.getElementById('copy-btn');
-            const qrcodeModal = document.getElementById('qrcode-modal');
-            const qrcodeContainer = document.getElementById('qrcode-container');
-            const qrcodeCloseBtn = document.getElementById('qrcode-close-btn');
-            
-            let heartbeatInterval;
-            let lastPongTime = Date.now();
-            let isScrollModeInitialized = false;
-            let lastRawText = "";
-            let lastContent = '';
-            let lastStateForReposition = null;
+  <script src="https://cdn.jsdelivr.net/gh/google/diff-match-patch@master/javascript/diff_match_patch.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const socket = io({ transports: ["websocket"] });
+      const ROOM_ID = "{{ room_id }}";
+      const viewerText = document.getElementById('viewer-text');
+      const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+      const scrollEl = document.documentElement;
+      let dmp = new diff_match_patch();
+      let currentText = '';
 
-            function startHeartbeat() {
-                if (heartbeatInterval) clearInterval(heartbeatInterval);
-                heartbeatInterval = setInterval(() => {
-                    const now = Date.now();
-                    socket.emit('ping', { room: ROOM_ID, timestamp: now });
-                    if (now - lastPongTime > 10000) {
-                        statusElement.textContent = "連線異常";
-                        statusElement.style.color = '#FFA500';
-                    }
-                }, 60000);
+      // --- 新增：FAB & Modal 相關 DOM 元素 ---
+      const fabContainer = document.getElementById('fab-container');
+      const fabToggleBtn = document.getElementById('fab-toggle-btn');
+      const fabCopyBtn = document.getElementById('fab-copy-btn');
+      const fabQrcodeBtn = document.getElementById('fab-qrcode-btn');
+      const viewerShareModal = document.getElementById('viewer-share-modal');
+      const viewerQrcodeContainer = document.getElementById('viewer-qrcode-container');
+      const viewerShareCloseBtn = document.getElementById('viewer-share-close-btn');
+
+
+      // --- Auto-scroll Logic ---
+      function isScrolledToBottom() {
+          const threshold = 5;
+          return scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < threshold;
+      }
+
+      function scrollToBottom() {
+          scrollEl.scrollTop = scrollEl.scrollHeight;
+      }
+
+      function handleScroll() {
+          if (isScrolledToBottom()) {
+              scrollToBottomBtn.classList.remove('visible');
+          } else {
+              scrollToBottomBtn.classList.add('visible');
+          }
+      }
+
+      function wrapUpdateFunction(updateFn) {
+          return function(...args) {
+              const shouldScroll = isScrolledToBottom();
+              updateFn(...args);
+              if (shouldScroll) {
+                  setTimeout(scrollToBottom, 0);
+              }
+              handleScroll();
+          }
+      }
+
+      const wrappedRender = wrapUpdateFunction((text) => {
+        currentText = text; // 確保 currentText 永遠是最新最完整的文本
+        viewerText.textContent = text;
+      });
+
+      socket.on('connect', () => {
+        socket.emit('join', { room: ROOM_ID });
+      });
+
+		// === 將上面的函式替換為這個正確的版本 ===
+		function applyViewerSettings(settings) {
+			if (!settings) return;
+
+			// 1. 套用所有非顏色相關的設定
+			if (settings.fontFamily) viewerText.style.fontFamily = settings.fontFamily;
+			if (settings.fontSize) viewerText.style.fontSize = settings.fontSize;
+			if (settings.lineHeight) viewerText.style.lineHeight = settings.lineHeight;
+			if (settings.fontStyle) viewerText.style.fontStyle = settings.fontStyle;
+			if (settings.fontWeight) viewerText.style.fontWeight = settings.fontWeight;
+
+			// 2. 【核心修改】直接使用從導播端傳來的顏色值
+            // 這樣才能響應導播端的任何顏色修改
+			if (settings.backgroundColor) {
+                document.body.style.backgroundColor = settings.backgroundColor;
+            }
+            if (settings.color) {
+                viewerText.style.color = settings.color;
             }
 
-            socket.on('connect', () => { 
-                statusElement.textContent = "已連線"; 
-                statusElement.style.color = '#008000'; 
-                socket.emit('join', { room: ROOM_ID, client_type: 'viewer' }); 
-                startHeartbeat();
-            });
-            socket.on('disconnect', () => { 
-                statusElement.textContent = "連線中斷"; 
-                statusElement.style.color = '#FF0000'; 
-                if (heartbeatInterval) clearInterval(heartbeatInterval);
-            });
-            socket.on('pong', (data) => {
-                lastPongTime = Date.now();
-                const latency = lastPongTime - data.timestamp;
-                statusElement.textContent = `已連線 (${latency}ms)`;
-                statusElement.style.color = '#008000';
-            });
-            
-            socket.on('state_update', (state) => {
-                lastStateForReposition = state;
-                const pushSettings = state.push_settings || { display_lines: 1, transition_mode: 'fade' };
-                updateStyles(state.style_settings);
+			// 3. 根據主題決定「捲動按鈕」的樣式 (這部分保留)
+			if (settings.theme === 'dark') {
+              scrollToBottomBtn.classList.remove('light-mode-fab');
+			} else {
+              scrollToBottomBtn.classList.add('light-mode-fab');
+			}
+		}
 
-                const isScroll = pushSettings.transition_mode === 'scroll' || pushSettings.transition_mode === 'scroll-normal';
+      socket.on('state_update', (state) => {
+        if (state && state.viewer_settings) {
+          applyViewerSettings(state.viewer_settings);
+        }
+        if (typeof state.raw_text === 'string') {
+          wrappedRender(state.raw_text);
+        }
+      });
 
-                if (!isScroll && isScrollModeInitialized) {
-                    cleanupScrollContainer();
-                    isScrollModeInitialized = false;
-                }
+      socket.on('viewer_settings_update', (payload) => {
+        if (payload && payload.settings) {
+          applyViewerSettings(payload.settings);
+        }
+      });
 
-                if (isScroll) {
-                    subtitleContainer.style.justifyContent = 'flex-start';
-                    if (!isScrollModeInitialized || lastRawText !== state.raw_text) {
-                        initializeScrollContainer(state.lines);
-                        isScrollModeInitialized = true;
-                        lastRawText = state.raw_text;
-                    }
-                    updateScrollHighlight(state.current_index, pushSettings.display_lines, pushSettings.transition_mode, state.style_settings);
-                } else {
-                    const lines = state.lines || [];
-                    const currentIndex = state.current_index || 0;
-                    const displayLines = pushSettings.display_lines || 1;
-                    const startIndex = Math.max(0, currentIndex - (displayLines - 1));
-                    const linesToShow = lines.slice(startIndex, currentIndex + 1);
-                    const newContentKey = linesToShow.join('|') + currentIndex;
+      // NOTE: interimSpan 在頂層建立，只建立一次，避免 script_patched 每次回呼都重複建立
+      const interimSpan = document.createElement('span');
+      interimSpan.style.color = 'rgba(128,128,128,0.6)';
+      interimSpan.style.fontStyle = 'italic';
+      viewerText.appendChild(interimSpan);
 
-                    if (newContentKey === lastContent) return;
-                    lastContent = newContentKey;
+      // NOTE: interim_text 監聽器在頂層只注冊一次
+      socket.on('interim_text', (data) => {
+        if (!data || !data.text) {
+          interimSpan.textContent = '';
+          return;
+        }
+        interimSpan.textContent = data.text;
+      });
 
-                    const newHtmlContent = linesToShow.map((line, i) => {
-                        const lineIndex = startIndex + i;
-                        const isMainLine = (lineIndex === currentIndex);
-                        const id = isMainLine ? 'main-line' : '';
-                        const parsedLine = marked.parseInline(cleanLineForDisplay(line), { gfm: true, breaks: true });
-                        return `<p id="${id}">${parsedLine || '&nbsp;'}</p>`;
-                    }).join('');
+      socket.on('script_patched', wrapUpdateFunction((data) => {
+        try {
+          const patches = dmp.patch_fromText(data.patch || '');
+          const [newText, results] = dmp.patch_apply(patches, currentText);
+          if (results.some(r => !r)) {
+            socket.emit('join', { room: ROOM_ID });
+            return;
+          }
+          wrappedRender(newText);
+          // NOTE: 落地後清除 interim overlay（文字已寫入正文）
+          interimSpan.textContent = '';
+        } catch(e) {
+          socket.emit('join', { room: ROOM_ID });
+        }
+      }));
 
-                    if (pushSettings.transition_mode === 'fade') {
-                        subtitleContent.classList.add('hidden');
-                        setTimeout(() => {
-                            updateDirectContent(newHtmlContent, state.style_settings, state.current_index);
-                            subtitleContent.classList.remove('hidden');
-                        }, 150);
-                    } else {
-                        updateDirectContent(newHtmlContent, state.style_settings, state.current_index);
-                    }
-                }
-            });
-            
-            function cleanLineForDisplay(line) {
-                return line.replace(/^§\s*/, '').replace(/^#\s*/, '');
-            }
+      // --- 新增：FAB & Modal Logic ---
 
-            function updateStyles(styles) {
-                if (!styles) return;
-                const REFERENCE_WIDTH = 1920;
-                bodyElement.style.backgroundColor = styles.bg_color;
-                const userMargin = styles.margin !== undefined ? styles.margin : 30;
-                const userFontSize = styles.font_size !== undefined ? styles.font_size : 100;
-                const textAlign = styles.text_align || 'left';
-                const fontVariant = styles.font_variant || 'normal';
-                const viewerWidth = subtitleContainer.clientWidth;
+      // 主按鈕：展開/收合選單
+      fabToggleBtn.addEventListener('click', () => {
+          fabContainer.classList.toggle('active');
+      });
 
-                if (viewerWidth > 0) {
-                    const actualMargin = (userMargin / REFERENCE_WIDTH) * viewerWidth;
-                    const textAreaWidth = viewerWidth - (actualMargin * 2);
-                    const referenceTextAreaWidth = REFERENCE_WIDTH - (userMargin * 2);
-                    const actualFontSize = (userFontSize / referenceTextAreaWidth) * textAreaWidth;
+      // 選項一：複製所有字幕
+      fabCopyBtn.addEventListener('click', () => {
+          if (navigator.clipboard) {
+              navigator.clipboard.writeText(currentText).then(() => {
+                  const originalText = fabCopyBtn.textContent;
+                  fabCopyBtn.textContent = '已複製!';
+                  setTimeout(() => {
+                      fabCopyBtn.textContent = originalText;
+                  }, 2000);
+              }).catch(err => {
+                  alert('複製失敗，請檢查瀏覽器權限。');
+              });
+          } else {
+              alert('您的瀏覽器不支援自動複製功能。');
+          }
+          fabContainer.classList.remove('active'); // 點擊後收合選單
+      });
 
-                    const containerStyles = {
-                        color: styles.fg_color,
-                        fontFamily: styles.font_family,
-                        textAlign: textAlign,
-                        paddingLeft: `${actualMargin}px`,
-                        paddingRight: `${actualMargin}px`,
-                        fontSize: `${actualFontSize}px`,
-                        fontWeight: (fontVariant === 'bold') ? 'bold' : 'normal',
-                        fontStyle: (fontVariant === 'italic') ? 'italic' : 'normal'
-                    };
-                    Object.assign(subtitleContainer.style, containerStyles);
-                    subtitleContent.style.textAlign = textAlign;
-                }
-            }
+      // 選項二：顯示 QR Code
+      fabQrcodeBtn.addEventListener('click', () => {
+          const viewerUrl = window.location.href;
+          viewerQrcodeContainer.innerHTML = ''; // 清空舊的 QR Code
+          try {
+              new QRCode(viewerQrcodeContainer, {
+                  text: viewerUrl,
+                  width: 200,
+                  height: 200,
+                  correctLevel: QRCode.CorrectLevel.M
+              });
+              viewerShareModal.style.display = 'flex';
+          } catch(e) {
+              alert('無法生成 QR Code。');
+          }
+          fabContainer.classList.remove('active'); // 點擊後收合選單
+      });
+      
+      // 關閉 QR Code Modal
+      viewerShareCloseBtn.addEventListener('click', () => {
+          viewerShareModal.style.display = 'none';
+      });
+      viewerShareModal.addEventListener('click', (event) => {
+          if (event.target === viewerShareModal) { // 點擊背景遮罩時關閉
+              viewerShareModal.style.display = 'none';
+          }
+      });
 
-            function initializeScrollContainer(lines) {
-                subtitleContainer.innerHTML = '';
-                subtitleContainer.classList.add('scroll-mode');
-
-                const topPadding = document.createElement('div');
-                topPadding.className = 'scroll-padding';
-                subtitleContainer.appendChild(topPadding);
-
-                lines.forEach((line, index) => {
-                    const p = document.createElement('p');
-                    p.id = `line-${index}`;
-                    p.className = 'line';
-                    
-                    // ★★★ 最終修正點 ★★★
-                    const cleanedLine = cleanLineForDisplay(line).replace(/\n/g, '<br>');
-                    p.innerHTML = cleanedLine || '&nbsp;'; // 如果行為空，使用 &nbsp;
-                    
-                    subtitleContainer.appendChild(p);
-                });
-
-                const bottomPadding = document.createElement('div');
-                bottomPadding.className = 'scroll-padding';
-                subtitleContainer.appendChild(bottomPadding);
-            }
-            
-            function cleanupScrollContainer() {
-                subtitleContainer.classList.remove('scroll-mode');
-                subtitleContainer.innerHTML = '<div id="subtitle-content">等待字幕...</div>';
-                subtitleContent = document.getElementById('subtitle-content');
-                subtitleContent.style.transform = 'translateY(0px)';
-            }
-
-            function updateScrollHighlight(currentIndex, displayLines, transitionMode, style_settings) {
-                const startIndex = Math.max(0, currentIndex - (displayLines - 1));
-                document.querySelectorAll('#subtitle-container .line').forEach(el => {
-                    const lineIndex = parseInt(el.id.split('-')[1]);
-                    if (lineIndex > currentIndex) {
-                        el.style.opacity = '0';
-                    } else if (lineIndex >= startIndex && lineIndex <= currentIndex) {
-                        el.style.opacity = '1';
-                    } else {
-                        el.style.opacity = (transitionMode === 'scroll-normal') ? '1' : '0.4';
-                    }
-                });
-                const targetEl = document.getElementById(`line-${startIndex}`);
-                if (targetEl) {
-                    const verticalAlign = style_settings?.vertical_align || 'center';
-                    let blockPosition = 'center';
-                    if (verticalAlign === 'top') {
-                        blockPosition = 'start';
-                    } else if (verticalAlign === 'bottom') {
-                        blockPosition = 'end';
-                    }
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: blockPosition, inline: 'nearest' });
-                }
-            }
-
-            function updateDirectContent(newHtml, styles, currentIndex) {
-                subtitleContent.innerHTML = newHtml;
-
-                // [MODIFIED] 重置 flexbox 屬性，讓 transform 處理垂直對齊
-                if (!subtitleContainer.classList.contains('scroll-mode')) {
-                    // 重置為預設值，讓 updateDirectContent 中的 transform 處理垂直對齊
-                    subtitleContainer.style.justifyContent = 'flex-start';
-                }
-                
-                requestAnimationFrame(() => {
-                    const mainLineElement = document.getElementById('main-line');
-                    const verticalAlign = styles?.vertical_align || 'center';
-                    if (mainLineElement) {
-                        const containerHeight = subtitleContainer.clientHeight;
-                        const contentHeight = subtitleContent.offsetHeight;
-                        const mainLineTop = mainLineElement.offsetTop;
-                        const mainLineHeight = mainLineElement.offsetHeight;
-                        let targetY;
-                        if (verticalAlign === 'top') {
-                            targetY = mainLineTop;
-                        } else if (verticalAlign === 'bottom') {
-                            // 修正：讓內容底部對齊容器底部
-                            targetY = mainLineTop + mainLineHeight - containerHeight;
-                        } else {
-                            const mainLineCenter = mainLineTop + (mainLineHeight / 2);
-                            const containerCenter = containerHeight / 2;
-                            targetY = mainLineCenter - containerCenter;
-                        }
-                        const offset = -targetY;
-                        subtitleContent.style.transform = `translateY(${offset}px)`;
-                    } else if (subtitleContent.firstChild) {
-                        const containerHeight = subtitleContainer.clientHeight;
-                        const contentHeight = subtitleContent.offsetHeight;
-                        let offset = 0;
-                        if (verticalAlign === 'top') {
-                            offset = 0; // 靠上：內容頂部對齊容器頂部
-                        } else if (verticalAlign === 'bottom') {
-                            // 修正：確保內容底部對齊容器底部
-                            offset = containerHeight - contentHeight;
-                        } else {
-                            // 置中：內容中心對齊容器中心
-                            offset = (containerHeight - contentHeight) / 2;
-                        }
-                        subtitleContent.style.transform = `translateY(${offset}px)`;
-                    } else {
-                        subtitleContent.style.transform = 'translateY(0px)';
-                    }
-                });
-            }
-
-            socket.on('force_subtitle', (data) => {
-                if (isScrollModeInitialized) {
-                    cleanupScrollContainer();
-                    isScrollModeInitialized = false;
-                }
-                const text = data.text || '';
-                lastContent = text;
-                const newHtml = marked.parse(text, { gfm: true, breaks: true });
-                // [FIXED] 使用當前狀態的樣式設定，確保垂直對齊正確應用
-                const currentStyles = lastStateForReposition?.style_settings || {};
-                updateDirectContent(newHtml, currentStyles, lastStateForReposition?.current_index || 0);
-            });
-
-            window.addEventListener('resize', () => {
-                if (lastStateForReposition && !isScrollModeInitialized) {
-                    updateDirectContent(subtitleContent.innerHTML, lastStateForReposition.style_settings, lastStateForReposition.current_index);
-                }
-            });
-
-            fab.addEventListener('click', () => {
-                fab.classList.toggle('open');
-                fabMenu.classList.toggle('open');
-            });
-
-            copyBtn.addEventListener('click', () => {
-                fab.classList.remove('open');
-                fabMenu.classList.remove('open');
-                if (!lastStateForReposition || !lastStateForReposition.lines) {
-                    alert('沒有可複製的文本內容。');
-                    return;
-                }
-                const textToCopy = lastStateForReposition.lines
-                    .map(line => line.replace(/^§\s*/, ''))
-                    .join('\n');
-                if (navigator.clipboard && textToCopy) {
-                    navigator.clipboard.writeText(textToCopy).then(() => {
-                        const originalText = copyBtn.textContent;
-                        copyBtn.textContent = '已複製!';
-                        setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
-                    }, (err) => {
-                        alert('複製失敗: ' + err);
-                        console.error('Copy failed: ', err);
-                    });
-                } else {
-                    alert('複製功能不受支援或沒有內容可複製。');
-                }
-            });
-
-            qrcodeBtn.addEventListener('click', () => {
-                const url = window.location.href;
-                qrcodeContainer.innerHTML = '';
-                try {
-                    const qr = qrcode(0, 'L');
-                    qr.addData(url);
-                    qr.make();
-                    const dataUrl = qr.createDataURL(6, 10);
-                    const imgElement = document.createElement('img');
-                    imgElement.src = dataUrl;
-                    imgElement.alt = 'Viewer Link QR Code';
-                    imgElement.style.width = '256px';
-                    imgElement.style.height = '256px';
-                    qrcodeContainer.appendChild(imgElement);
-                    qrcodeModal.classList.add('visible');
-                } catch (e) {
-                    console.error('QR Code generation failed:', e);
-                    alert('產生 QR Code 失敗！');
-                }
-                fab.classList.remove('open');
-                fabMenu.classList.remove('open');
-            });
-
-            function closeModal() {
-                qrcodeModal.classList.remove('visible');
-            }
-
-            qrcodeCloseBtn.addEventListener('click', closeModal);
-            qrcodeModal.addEventListener('click', (e) => {
-                if (e.target === qrcodeModal) closeModal();
-            });
-        });
-    </script>
+      // Event Listeners
+      window.addEventListener('scroll', handleScroll);
+      scrollToBottomBtn.addEventListener('click', scrollToBottom);
+    });
+  </script>
 </body>
 </html>
