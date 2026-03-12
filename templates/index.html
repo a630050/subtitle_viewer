@@ -3,550 +3,457 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>字幕神器 - 導播端</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=KaiTi&display=swap" rel="stylesheet">
+    <title>協作編輯器</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f0f2f5; overflow: hidden; }
-        .main-container { display: flex; width: 100%; height: 100%; }
-
-        /* Left Pane: Editor + Sidebar */
-        .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 0.5em; overflow: hidden; }
-        .editor-pane h3 { font-size: 1.5em; margin: 0; }
-        .editor-area { display: flex; flex-direction: row; flex-grow: 1; gap: 1em; position: relative; align-items: stretch; }
-        
-        /* Collapsible Bookmark Sidebar */
-        #bookmark-sidebar { 
-            flex: 0 0 250px; /* Fixed width of 250px */
-            min-width: 0; /* Allow shrinking when collapsed */
-            transition: all 0.3s ease;
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-            height: 100%; /* 確保與編輯器容器同高 */
-            max-height: 100%; /* 限制最大高度 */
-            position: relative; /* 為絕對定位的書籤列表提供定位基準 */
-        }
-        #bookmark-sidebar.collapsed { flex: 0 0 0px; min-width: 0; padding: 0; border: none; margin-left: -1em; }
-        
-        /* Tab Navigation */
-        .sidebar-tabs {
-            display: flex;
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 0;
-        }
-        .sidebar-tab {
-            flex: 1;
-            padding: 8px 12px;
-            background: #f8f9fa;
-            border: none;
-            border-bottom: 2px solid transparent;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-        .sidebar-tab.active {
-            background: #fff;
-            border-bottom-color: #007bff;
-            color: #007bff;
-        }
-        .sidebar-tab:hover:not(.active) {
-            background: #e9ecef;
-        }
-        
-        /* Tab Content */
-        .tab-content {
-            position: absolute;
-            top: 55px; /* Tab height + margin */
-            left: 15px;
-            right: 15px;
-            bottom: 15px;
-            overflow-y: auto;
-        }
-        .tab-pane {
-            display: none;
-        }
-        .tab-pane.active {
-            display: block;
-        }
-        
-        /* Bookmarks Tab */
-        #bookmarks-list { 
-            list-style-type: none; 
-            padding: 0; 
-            margin: 0;
-        }
-        #bookmarks-list li { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        #bookmarks-list li:hover { background-color: #f5f5f5; }
-        
-        /* Quick Inputs Tab */
-        .quick-inputs-grid {
-            display: grid;
-            gap: 8px;
-        }
-        .quick-input-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .quick-input-label {
-            font-size: 12px;
-            color: #666;
-            min-width: 45px;
-            font-weight: bold;
-        }
-        .quick-input-field {
-            flex: 1;
-            padding: 6px 8px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 13px;
-        }
-        .quick-input-field:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
-        }
-        .author-signature { 
-            margin-left: 15px; 
-            padding: 5px 10px; 
-            font-size: 12px; 
-            color: #666; 
-            background-color: rgba(249, 249, 249, 0.9); 
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-        }
-
-        /* Editor Area */
-        .editor-wrapper { position: relative; flex: 1; /* Fill remaining space */ border: 1px solid #ccc; border-radius: 4px; background-color: #fff; height: 100%; }
-        #sidebar-toggle-btn { 
-            position: absolute; 
-            top: 50%; 
-            left: -1px;
-            transform: translateY(-50%); 
-            width: 18px; height: 60px; background-color: #e0e0e0; color: #555;
-            border: 1px solid #ccc; 
-            cursor: pointer; z-index: 10;
-            display: flex; align-items: center; justify-content: center; font-size: 1.2em;
-            border-radius: 0 8px 8px 0; user-select: none;
-        }
-        #bookmark-sidebar.collapsed + .editor-wrapper #sidebar-toggle-btn { transform: translateY(-50%) scaleX(-1); }
-
-        #line-numbers {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 60px; /* Initial width, will be adjusted by JS */
-            height: 100%;
-            box-sizing: border-box;
-            font-family: monospace; 
-            font-size: 16px; 
-            line-height: 1.6; 
-            padding: 10px 0px 10px 18px; 
-            background-color: #f7f7f7; 
-            color: #aaa; 
-            text-align: right; 
-            user-select: none; 
-            border-right: 1px solid #eee; 
-            overflow: hidden; /* Hide all scrollbars */
-            cursor: pointer; 
-        }
-		#line-numbers div {
-			position: relative;
-			padding-left: 50px;
-			padding-right: 0px;
-            padding-top: 0;
-			transition: all 0.2s;
-			box-sizing: border-box;
-			width: 100%;
-            height: auto;
-            min-height: 25.6px;
-			display: flex;
-			justify-content: flex-end;
-			align-items: flex-start; /* Aligns number to the top of the line block */
-		}
-        .bookmark-dot { position: absolute; left: 8px; top: 12.8px; transform: translateY(-50%); width: 10px; height: 10px; background-color: #3498db; border-radius: 50%; }
-        
-        .highlight-active {
-            background-color: #ffc107 !important;
-            color: #000 !important; 
-            font-weight: bold; 
-        }
-        .highlight-blank {
-            background-color: #cccccc !important;
-            color: #000 !important; 
-            font-weight: bold; 
-        }
-        
+        /* --- 基礎樣式 --- */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f0f2f5; color: #212529; overflow: hidden; transition: background-color 0.3s, color 0.3s; }
+        .main-container { display: flex; width: 100%; height: 100%; position: relative; }
+        .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 1em; transition: flex-grow 0.3s ease-in-out; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; flex-wrap: wrap; gap: 10px;}
+        .top-bar h3 { font-size: 1.5em; margin: 0; }
+        .file-buttons { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .file-buttons button, .file-buttons select { padding: 4px 8px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+		.file-buttons .share-btn { background-color: #0d6efd; color: #fff; border-color: #0d6efd; }
+		.file-buttons .share-btn:hover { background-color: #0b5ed7; border-color: #0a58ca; }
+		body.dark-mode .file-buttons .share-btn { background-color: #375a7f; border-color: #375a7f; }
+		.file-buttons .speech-btn { background-color: #4CAF50; color: white; border: none; transition: background-color 0.3s; }
+		.file-buttons .speech-btn.recording { background-color: #f44336; }
+        .editor-wrapper { position: relative; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
         #script-editor {
-            position: absolute;
-            left: 60px;
-            top: 0;
-            width: calc(100% - 60px);
+            width: 100%;
             height: 100%;
             box-sizing: border-box;
             font-family: monospace;
-            font-size: 16px; 
-            line-height: 1.6; 
-            border: none; 
-            padding: 10px 10px 10px 5px; 
-            resize: none; 
+            font-size: 24px;
+            border: none;
+            padding: 14px 36px; /* 左右留白再加大，確保不被左右收合按鈕(30px)遮住文字 */
+            resize: none;
             outline: none;
             background-color: #fff;
-            overflow-y: scroll;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            overflow-x: hidden;
+            color: #000;
+            transition: background-color 0.3s, color 0.3s;
         }
-
-        /* Right Pane: Controls */
-        .control-pane { flex: 1; border-left: 1px solid #ccc; background-color: #fff; padding: 1em; display: flex; flex-direction: column; overflow-y: auto; position: relative; transition: all 0.3s ease; }
-                .control-pane.collapsed { flex: 0 0 0px; min-width: 0; padding: 0; border-left: none; overflow: hidden; }
-
-        #right-sidebar-toggle-btn { 
-            position: absolute; 
-            top: 50%; 
-            right: -1px; 
-            transform: translateY(-50%) scaleX(1);
-            width: 18px; height: 60px; 
-            background-color: #e0e0e0; 
-            color: #555;
-            border: 1px solid #ccc; 
-            cursor: pointer; 
-            z-index: 10;
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 1.2em;
-            border-radius: 0 8px 8px 0; 
-            user-select: none; 
-        }
-        #right-sidebar-toggle-btn.collapsed { 
-            transform: translateY(-50%) scaleX(-1);
-        }
-        .control-box { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 20px; }
-        .control-box h3 { margin-top: 0; font-size: 1.1em; font-weight: bold; }
-        
-        #current-subtitle { aspect-ratio: 1920 / 1080; width: 100%; padding: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; font-weight: bold; line-height: 1.4; border-radius: 3px; background-color: #000;}
-        #current-subtitle span { 
-            width: 100%;
-            box-sizing: border-box;
-            transition: opacity 0.3s ease-in-out;
-        }
-        #current-subtitle span.hidden {
-            opacity: 0;
-        }
-
-        .config-buttons button { width: 100%; padding: 8px; font-size: 14px; cursor: pointer; }
-        .file-buttons button { padding: 4px 8px; font-size: 14px; cursor: pointer; flex: 1; white-space: nowrap; }
-        .file-buttons, .config-buttons { display: flex; gap: 10px; }
-        .style-control { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .style-control label { flex-basis: 40%; }
-        .style-control input, .style-control select { flex-basis: 55%; padding: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 3px; }
-        .config-buttons { margin-top: 15px; }
-        
         #status { position: fixed; bottom: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px; }
-        #file-input, #config-input { display: none; }
-        .share-box input { width: 100%; box-sizing: border-box; padding: 5px; border: 1px solid #ccc; border-radius: 3px; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background-color: #fff; padding: 20px; border-radius: 5px; text-align: center; }
+        .modal-content { background-color: #fff; padding: 20px; border-radius: 5px; text-align: center; color: #333; }
+        #file-input { display: none; }
 
-        #viewer-link-anchor {
+        /* --- 設定面板樣式 --- */
+        .settings-pane { flex: 0 0 260px; width: 260px; border-left: 1px solid #ccc; background-color: #fff; padding: 1em; overflow-y: auto; transition: all 0.3s ease-in-out; min-width: 220px; }
+        .settings-pane h4 { margin-top: 1.5em; margin-bottom: 0.8em; padding-bottom: 0.3em; border-bottom: 1px solid #eee; }
+        .settings-pane h4:first-of-type { margin-top: 0; }
+        .style-control { margin-bottom: 15px; }
+        .style-control label { display: block; margin-bottom: 5px; font-size: 14px; color: #333; }
+        .style-control input, .style-control select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+/* 美化顏色選取器 */
+.style-control input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+  cursor: pointer;
+}
+.style-control input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 4px;
+  border-radius: 8px;
+}
+.style-control input[type="color"]::-webkit-color-swatch {
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+}
+.style-control input[type="color"]::-moz-color-swatch {
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+}
+.style-control input[type="color"]:focus {
+  outline: 2px solid #80bdff;
+  outline-offset: 2px;
+}
+/* 設定面板內的動作按鈕組 */
+.settings-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.settings-actions button { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+body.dark-mode .settings-actions button { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+/* 深色模式下的顏色選取器樣式 */
+body.dark-mode .style-control input[type="color"] {
+  background-color: #2c2c2c;
+  border-color: #555;
+}
+body.dark-mode .style-control input[type="color"]::-webkit-color-swatch {
+  border-color: rgba(255,255,255,0.25);
+}
+body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
+  border-color: rgba(255,255,255,0.25);
+}
+		#dark-mode-toggle {
+			display: inline-flex;
+			align-items: center;   /* 垂直置中 */
+			justify-content: center; /* 水平置中（保險）*/
+			padding: 6px 10px;      /* 比左側 4px 稍小，但高一點 */
+			font-size: 13px;        /* 比左側 14px 稍小 */
+			line-height: 1;         /* 移除額外行高，避免看起來偏上/偏下 */
+			margin-left: 15px;
+			background-color: transparent;
+			border: 1px solid #ccc;
+			color: #555;
+			cursor: pointer;
+		}
+		
+		/* --- 分享連結樣式 --- */
+        #share-link-anchor {
             display: block;
             padding: 8px;
-            background-color: #e9ecef;
-            border: 1px solid #ced4da;
+            background-color: #f0f2f5;
+            border: 1px solid #ccc;
             border-radius: 4px;
-            color: #007bff;
-            text-decoration: none;
-            word-break: break-all;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        }
-
-        #viewer-link-anchor:hover {
-            background-color: #dde4ea;
+            color: #0d6efd;
             text-decoration: underline;
+            word-break: break-all;
+            font-family: monospace;
         }
-        
-        .speech-btn { background-color: #4CAF50; color: white; border: none; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-block; font-size: 14px; margin: 4px 2px; cursor: pointer; border-radius: 4px; transition: background-color 0.3s; }
-        .speech-btn:hover { background-color: #45a049; }
-        .speech-btn.recording { background-color: #f44336; animation: pulse 1.5s infinite; }
-        
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        .speech-btn.recording::after { content: " (錄音中...)"; }
-        .speech-status { margin-top: 10px; padding: 8px; border-radius: 4px; font-size: 14px; text-align: center; }
-        .speech-status.error { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
-        .speech-status.success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .settings-btn { background-color: #007bff; color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 14px; cursor: pointer; transition: background-color 0.3s; }
-        .settings-btn:hover { background-color: #0056b3; }
-        
-        #style-settings-modal .modal-content { width: 500px; max-width: 90vw; max-height: 90vh; overflow-y: auto; padding: 25px; }
-        .settings-tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
-        .settings-tab { padding: 8px 15px; cursor: pointer; background-color: #f1f1f1; border: 1px solid #ddd; border-bottom: none; margin-right: 5px; border-radius: 5px 5px 0 0; }
-        .settings-tab.active { background-color: white; border-bottom: 1px solid white; margin-bottom: -1px; font-weight: bold; }
-        .settings-panel { display: none; }
-        .settings-panel.active { display: block; }
+        body.dark-mode #share-link-anchor {
+            background-color: #3a3a3a;
+            border-color: #555;
+            color: #82c0ff;
+        }
 
-        /* Night Mode Easter Egg */
-        body.night-mode { background-color: #1e1e1e; color: #e0e0e0; }
-        body.night-mode .editor-pane, body.night-mode .main-container { background-color: #1e1e1e; }
-        body.night-mode .control-pane, body.night-mode #bookmark-sidebar, body.night-mode .editor-wrapper, body.night-mode .control-box { background-color: #252526; border-color: #3c3c3c; }
-        body.night-mode #script-editor { background-color: #252526; color: #e0e0e0; }
-        body.night-mode #line-numbers { background-color: #333; color: #858585; border-right-color: #3c3c3c; }
-        body.night-mode .highlight-active { background-color: #007acc !important; color: #fff !important; }
-        body.night-mode .highlight-blank { background-color: #555 !important; color: #fff !important; }
-        body.night-mode h3, body.night-mode h4 { color: #e0e0e0; }
-        body.night-mode button, body.night-mode .fab-menu-item { background-color: #3e3e42; color: #e0e0e0; border: 1px solid #555; }
-        body.night-mode button:hover, body.night-mode .fab-menu-item:hover { background-color: #555; }
-        body.night-mode .speech-btn { background-color: #007acc; color: white; border: none; }
-        body.night-mode .speech-btn:hover { background-color: #005f9e; }
-        body.night-mode .speech-btn.recording { background-color: #c72c41; }
-        body.night-mode select, body.night-mode input[type=text], body.night-mode input[type=number] { background-color: #3c3c3c; color: #e0e0e0; border-color: #555; }
-        body.night-mode #bookmarks-list li { border-bottom-color: #3c3c3c; }
-        body.night-mode #bookmarks-list li:hover { background-color: #3e3e42; }
-        body.night-mode #sidebar-toggle-btn, body.night-mode #right-sidebar-toggle-btn { background-color: #3e3e42; color: #e0e0e0; border-color: #555; }
-        body.night-mode .author-signature { background-color: #252526; color: #858585; border-color: #3c3c3c; cursor: pointer; }
-        body.night-mode #viewer-link-anchor { background-color: #333; color: #8ab4f8; border-color: #555; }
-        body.night-mode #viewer-link-anchor:hover { background-color: #444; }
-        body.night-mode .settings-tab { background-color: #333; border-color: #555; }
-        body.night-mode .settings-tab.active { background-color: #252526; border-bottom-color: #252526; }
-        body.night-mode .modal-content { background-color: #2d2d2d; }
-        body.night-mode .speech-status.error { background-color: #5c2323; color: #ffb1b1; border-color: #8c3333; }
-        body.night-mode .speech-status.success { background-color: #224a22; color: #b3e6b3; border-color: #336633; }
+        /* === 夜間模式樣式 === */
+        body.dark-mode { background-color: #1a1a1a; color: #e0e0e0; }
+        body.dark-mode .settings-pane { background-color: #2c2c2c; border-left-color: #444; }
+        body.dark-mode .settings-pane h4 { border-bottom-color: #444; }
+        body.dark-mode .style-control label { color: #e0e0e0; }
+        body.dark-mode .style-control input, body.dark-mode .style-control select,
+        body.dark-mode .file-buttons button, body.dark-mode .file-buttons select { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .style-control input[type="color"] { border-width: 2px; }
+        body.dark-mode .editor-wrapper { border-color: #444; }
+        body.dark-mode #script-editor { background-color: #2c2c2c; color: #e0e0e0; }
+        body.dark-mode .modal-content { background-color: #3a3a3a; color: #e0e0e0; }
+        body.dark-mode #dark-mode-toggle {
+			background-color: transparent;
+			border-color: #555;
+			color: #aaa;
+		}
+        body.dark-mode #status { background-color: rgba(255,255,255,0.2); color: #fff; }
+
+        /* === 面板收合按鈕樣式 (改良) === */
+        #pane-toggle-btn {
+            position: absolute;
+            top: 50%;
+            right: 260px;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 64px;
+            background-color: #6c757d;
+            color: #fff;
+            border: 1px solid rgba(0,0,0,0.15);
+            border-right: none; /* 與面板邊界貼齊，避免多一道線 */
+            border-radius: 10px 0 0 10px;
+            cursor: pointer;
+            z-index: 100; /* 確保覆蓋在內容之上 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            transition: right 0.25s ease-in-out, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #pane-toggle-btn:hover {
+            background-color: #5a6268;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        #pane-toggle-btn:active {
+            background-color: #545b62;
+        }
+        /* 當面板收合時的樣式 */
+        .main-container.settings-collapsed .settings-pane {
+            flex: 0 0 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            border-left: none;
+            opacity: 0;
+        }
+        .main-container.settings-collapsed #pane-toggle-btn {
+            right: 0; /* 按鈕移動到最右邊 */
+        }
+        /* 夜間模式下的按鈕樣式 */
+        body.dark-mode #pane-toggle-btn {
+            background-color: #3a3a3a;
+            border-color: #555;
+        }
+        .scroll-to-bottom-btn {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: opacity 0.2s, transform 0.2s;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+        .scroll-to-bottom-btn.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .scroll-to-bottom-btn:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        .scroll-to-bottom-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+        body.dark-mode .scroll-to-bottom-btn {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+        body.dark-mode .scroll-to-bottom-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        /* --- 片段面板樣式（左側） --- */
+        .snippets-pane { flex: 0 0 260px; width: 260px; border-right: 1px solid #ccc; background-color: #fff; padding: 1em; overflow-y: auto; transition: all 0.3s ease-in-out; min-width: 220px; }
+        .snippets-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .snippet-item { border: 1px solid #ccc; border-radius: 6px; padding: 8px; background-color: #fff; display: grid; grid-template-columns: 28px 1fr auto; grid-template-rows: auto; grid-template-areas: 'label textarea button'; gap: 8px; align-items: start; }
+        .snippet-item label { grid-area: label; display: inline-flex; justify-content: center; align-items: center; width: 28px; height: 28px; background: #f0f2f5; border-radius: 50%; font-weight: 600; color: #555; border: 1px solid #ddd; }
+        .snippet-item textarea { grid-area: textarea; width: 100%; min-height: 54px; resize: vertical; font-size: 14px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .snippet-item .snippet-insert-btn { grid-area: button; padding: 6px 10px; font-size: 13px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+        .snippets-actions { margin-top: 8px; }
+        .snippets-actions button { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+
+        /* 收合時樣式（左側） */
+        .main-container.snippets-collapsed .snippets-pane { flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; padding: 0 !important; overflow: hidden; border-right: none; opacity: 0; }
+        .main-container.snippets-collapsed #snippets-toggle-btn { left: 0; }
+
+        /* 左側面板收合按鈕樣式 */
+        #snippets-toggle-btn { position: absolute; top: 50%; left: 260px; transform: translateY(-50%); width: 30px; height: 64px; background-color: #6c757d; color: #fff; border: 1px solid rgba(0,0,0,0.15); border-left: none; border-radius: 0 10px 10px 0; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: left 0.25s ease-in-out, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; } /* 與右側寬度一致: 30px */
+        #snippets-toggle-btn:hover { background-color: #5a6268; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #snippets-toggle-btn:active { background-color: #545b62; }
+
+        /* 深色模式支援 - 左側片段面板 */
+        body.dark-mode .snippets-pane { background-color: #2c2c2c; border-right-color: #444; }
+        body.dark-mode .snippet-item { background-color: #2c2c2c; border-color: #555; }
+        body.dark-mode .snippet-item label { background-color: #3a3a3a; color: #ddd; border-color: #555; }
+        body.dark-mode .snippet-item textarea { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .snippet-item .snippet-insert-btn, body.dark-mode .snippets-actions button { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+        body.dark-mode #snippets-toggle-btn { background-color: #3a3a3a; border-color: #555; }
+
+        /* === Remote Cursors & Selections === */
+        #remote-cursors-overlay {
+            position: absolute;
+            /* 移除固定的 padding，讓它和 textarea 完美重疊 */
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 999;
+            overflow: hidden; /* 確保游標不會畫到外面 */
+        }
+		/* === Interim Overlay (灰字浮水印) === */
+		.interim-overlay {
+		  position: absolute;
+		  pointer-events: none;
+		  color: rgba(128, 128, 128, 0.6);
+		  font-style: italic;
+
+		  /* 新增：確保字體跟 textarea 一樣 */
+		  white-space: pre-wrap;
+		  word-wrap: break-word;
+		  width: 100%;
+		  box-sizing: border-box;
+		}
+        .remote-cursor {
+            position: absolute;
+            width: 2px;
+            background-color: red; /* 顏色會由 JS 動態設定 */
+            opacity: 0.9;
+            transition: top 0.05s linear, left 0.05s linear; /* 加快過渡，感覺更即時 */
+        }
+        .remote-cursor::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -20px; /* 向上偏移更多，避免擋住游標本身 */
+            left: -4px;
+            background-color: inherit;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+        .remote-selection {
+            position: absolute;
+            background-color: blue; /* 顏色會由 JS 動態設定 */
+            opacity: 0.3;
+        }
+
     </style>
 </head>
 <body>
-    <div class="main-container">
+    <!-- NOTE: 默認收折左右矢板，首次進入不佔用編輯區空間 -->
+    <div class="main-container snippets-collapsed settings-collapsed">
+        <!-- 左側：片段面板（可收合） -->
+        <div id="snippets-pane" class="snippets-pane" aria-label="片段插入面板">
+            <div id="snippets-body">
+                <h3 style="margin-top: 0;">常用片段</h3>
+                <div class="snippets-grid">
+                    <!-- 10 個片段格，1~9 與 0 對應快捷鍵 -->
+                    <div class="snippet-item"><label>1</label><textarea id="snippet-1" placeholder="Ctrl+1 插入"></textarea><button data-snippet="1" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>2</label><textarea id="snippet-2" placeholder="Ctrl+2 插入"></textarea><button data-snippet="2" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>3</label><textarea id="snippet-3" placeholder="Ctrl+3 插入"></textarea><button data-snippet="3" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>4</label><textarea id="snippet-4" placeholder="Ctrl+4 插入"></textarea><button data-snippet="4" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>5</label><textarea id="snippet-5" placeholder="Ctrl+5 插入"></textarea><button data-snippet="5" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>6</label><textarea id="snippet-6" placeholder="Ctrl+6 插入"></textarea><button data-snippet="6" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>7</label><textarea id="snippet-7" placeholder="Ctrl+7 插入"></textarea><button data-snippet="7" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>8</label><textarea id="snippet-8" placeholder="Ctrl+8 插入"></textarea><button data-snippet="8" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>9</label><textarea id="snippet-9" placeholder="Ctrl+9 插入"></textarea><button data-snippet="9" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>0</label><textarea id="snippet-0" placeholder="Ctrl+0 插入"></textarea><button data-snippet="0" class="snippet-insert-btn">插入</button></div>
+                </div>
+            </div>
+            <div class="snippets-actions">
+                <button id="snippets-clear-btn">清空全部片段</button>
+            </div>
+        </div>
+        <div id="snippets-toggle-btn" tabindex="0" role="button" aria-controls="snippets-pane" aria-expanded="false" aria-label="展開片段">&raquo;</div>
         <div class="editor-pane">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3>文本編輯區</h3>
-				
-                <div class="file-buttons" style="display: flex; align-items: center; gap: 10px;">
-					<select id="speech-lang-select" style="padding: 4px 8px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc;">
-						<option value="zh-TW" selected>繁體中文</option>
-						<option value="en-US">English</option>
-						<option value="ja-JP">日本語</option>
-					</select>
-					<button id="speech-toggle-btn" class="speech-btn" style="padding: 4px 12px; white-space: nowrap; margin-right: 15px;">開始語音識別</button>		
-				
-				
-				
+            <div class="top-bar">
+                <h3>協作文本編輯區</h3>
+                <div class="file-buttons">
+                    <button id="share-viewer-btn" class="share-btn">分享觀眾</button>
+                    <select id="speech-lang-select">
+                        <option value="zh-TW" selected>繁體中文</option>
+                        <option value="en-US">English</option>
+                        <option value="ja-JP">日本語</option>
+                    </select>
+                    <button id="speech-toggle-btn" class="speech-btn">開始語音識別</button>
                     <button id="import-btn">匯入文本</button>
                     <button id="export-btn">匯出文本</button>
                     <button id="clear-btn">清除文本</button>
                     <button id="replace-words-btn">置換詞彙</button>
                     <button id="leave-room-btn">離開房間</button>
-
-                    <div class="author-signature">程式作者：徐承佑</div>
+					<button id="dark-mode-toggle">程式作者：徐承佑</button>
                 </div>
-				
-				
             </div>
-			
-			<div id="speech-status" class="speech-status" style="display: none; margin: 0 0 0.5em 0;"></div>
-			
-            <div class="editor-area">
-                <div id="bookmark-sidebar" class="control-box">
-                    <!-- Tab Navigation -->
-                    <div class="sidebar-tabs">
-                        <button class="sidebar-tab active" data-tab="bookmarks">書籤</button>
-                        <button class="sidebar-tab" data-tab="quick-inputs">快捷輸入</button>
-                    </div>
-                    
-                    <!-- Tab Content -->
-                    <div class="tab-content">
-                        <!-- Bookmarks Tab -->
-                        <div id="bookmarks-tab" class="tab-pane active">
-                            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px; margin-top: 10px;">
-                                <button id="goto-first-line-btn" style="padding: 4px 12px; font-size: 12px; cursor: pointer;">至首行</button>
-                                <button id="goto-last-line-btn" style="padding: 4px 12px; font-size: 12px; cursor: pointer; margin-left: 8px;">至末行</button>
-                            </div>
-                            <ul id="bookmarks-list"></ul>
-                        </div>
-                        
-                        <!-- Quick Inputs Tab -->
-                        <div id="quick-inputs-tab" class="tab-pane">
-                            <div class="quick-inputs-grid" style="margin-top: 10px;">
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+1</span>
-                                    <input type="text" class="quick-input-field" data-key="1" placeholder="快捷輸入 1">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+2</span>
-                                    <input type="text" class="quick-input-field" data-key="2" placeholder="快捷輸入 2">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+3</span>
-                                    <input type="text" class="quick-input-field" data-key="3" placeholder="快捷輸入 3">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+4</span>
-                                    <input type="text" class="quick-input-field" data-key="4" placeholder="快捷輸入 4">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+5</span>
-                                    <input type="text" class="quick-input-field" data-key="5" placeholder="快捷輸入 5">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+6</span>
-                                    <input type="text" class="quick-input-field" data-key="6" placeholder="快捷輸入 6">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+7</span>
-                                    <input type="text" class="quick-input-field" data-key="7" placeholder="快捷輸入 7">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+8</span>
-                                    <input type="text" class="quick-input-field" data-key="8" placeholder="快捷輸入 8">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+9</span>
-                                    <input type="text" class="quick-input-field" data-key="9" placeholder="快捷輸入 9">
-                                </div>
-                                <div class="quick-input-item">
-                                    <span class="quick-input-label">Ctrl+0</span>
-                                    <input type="text" class="quick-input-field" data-key="10" placeholder="快捷輸入 10">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="editor-wrapper">
-                    <div id="sidebar-toggle-btn">&laquo;</div>
-                    <div id="right-sidebar-toggle-btn">&raquo;</div>
-                    <div id="line-numbers"></div>
-                    <div id="line-measure" style="position: absolute; top: -9999px; left: 0; visibility: hidden; white-space: pre-wrap; word-wrap: break-word;"></div>
-                    <textarea id="script-editor" placeholder="在此輸入或貼上文本..." wrap="soft"></textarea>
-                </div>
+            <div class="editor-wrapper">
+                <!-- === Remote Cursors & Selections Overlay === -->
+                <div id="remote-cursors-overlay"></div>
+                <textarea id="script-editor" placeholder="在此輸入或貼上文本..."></textarea>
+                <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" title="捲動到底部">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
             </div>
         </div>
-        <div class="control-pane">
-            <div class="control-box">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <h3>投播效果示意</h3>
-					<button id="share-btn" style="padding: 5px 10px; font-size: 14px; cursor: pointer; background-color: #17a2b8; color: white; border: none; border-radius: 4px;">分享字幕</button>
+        <div id="settings-pane" class="settings-pane" aria-label="排版設定面板">
+            <div id="settings-body">
+                
+                <h4>編輯區設定</h4>
+				<div class="style-control">
+					<label for="director-speech-break-mode">語音轉錄換行</label>
+					<select id="director-speech-break-mode">
+						<option value="join">連續模式</option>
+						<option value="newline" selected>換行模式</option>
+						<option value="double-newline">空行模式</option>
+					</select>
+				</div>
+                <div class="style-control">
+                    <label for="director-font-family-select">字體</label>
+                    <select id="director-font-family-select">
+                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif">微軟正黑體</option>
+                        <option value="KaiTi, '標楷體', serif">標楷體</option>
+                        <option value="MingLiU, '細明體', serif">細明體</option>
+                    </select>
                 </div>
-                <div id="current-subtitle"><span>...</span></div>
+                <div class="style-control">
+                    <label for="director-font-size-input">字體大小 (px)</label>
+                    <input type="number" id="director-font-size-input" min="8" max="72" step="1" value="24">
+                </div>
+                <div class="style-control">
+                    <label for="director-line-height-input">行距</label>
+                    <input type="number" id="director-line-height-input" min="1" max="3" step="0.1" value="1.2">
+                </div>
+                <div class="style-control">
+                    <label for="director-font-style-select">字體樣式</label>
+                    <select id="director-font-style-select">
+                        <option value="normal">正常</option>
+                        <option value="bold">粗體</option>
+                        <option value="italic">斜體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="director-font-color-input">字體顏色</label>
+                    <input type="color" id="director-font-color-input" value="#000000">
+                </div>
+                <div class="style-control">
+                    <label for="director-bg-color-input">背景顏色</label>
+                    <input type="color" id="director-bg-color-input" value="#FFFFFF">
+                </div>
+
+                <hr style="margin: 2em 0; border: none; border-top: 1px solid #ddd;">
+                
+                <h4>觀眾端設定</h4>
+                <div class="style-control">
+                    <label for="viewer-font-family-select">字體</label>
+                    <select id="viewer-font-family-select">
+                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif">微軟正黑體</option>
+                        <option value="KaiTi, '標楷體', serif">標楷體</option>
+                        <option value="MingLiU, '細明體', serif">細明體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="viewer-font-size-input">字體大小 (px)</label>
+                    <input type="number" id="viewer-font-size-input" min="8" max="120" step="1" value="80">
+                </div>
+                <div class="style-control">
+                    <label for="viewer-line-height-input">行距</label>
+                    <input type="number" id="viewer-line-height-input" min="1" max="3" step="0.1" value="1.2">
+                </div>
+                <div class="style-control">
+                    <label for="viewer-font-style-select">字體樣式</label>
+                    <select id="viewer-font-style-select">
+                        <option value="normal">正常</option>
+                        <option value="bold">粗體</option>
+                        <option value="italic">斜體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="viewer-font-color-input">字體顏色</label>
+                    <input type="color" id="viewer-font-color-input" value="#FFFFFF">
+                </div>
+                <div class="style-control">
+                    <label for="viewer-bg-color-input">背景顏色</label>
+                    <input type="color" id="viewer-bg-color-input" value="#000000">
+                </div>
             </div>
 
-            
-
-			
-		<div class="control-box">
-			<h3>排版與推播設定</h3>
-			<div class="settings-tabs">
-				<div class="settings-tab active" data-panel="style-panel">排版設定</div>
-				<div class="settings-tab" data-panel="broadcast-panel">推播設定</div>
-			</div>
-			
-			<div id="style-panel" class="settings-panel active" style="padding-top: 15px;">
-				<div class="style-control">
-					<label for="font-family-select">字體</label>
-					<select id="font-family-select">
-						<option value="'Microsoft JhengHei', '蘋方-繁', sans-serif" selected>微軟正黑體</option>
-						<option value="'Noto Sans TC', sans-serif">思源黑體</option>
-						<option value="KaiTi, '標楷體', serif">標楷體</option>
-						<option value="MingLiU, '細明體', serif">細明體</option>
-						<option value="Arial, sans-serif">Arial</option>
-						<option value="Verdana, sans-serif">Verdana</option>
-					</select>
-				</div>
-				<div class="style-control">
-					<label for="font-size-input">字體大小 (px)</label>
-					<input type="number" id="font-size-input" min="10" max="200" step="2">
-				</div>
-				<div class="style-control">
-					<label for="font-variant-select">字樣</label>
-					<select id="font-variant-select">
-						<option value="normal" selected>正常</option>
-						<option value="bold">粗體</option>
-						<option value="italic">斜體</option>
-					</select>
-				</div>
-				<div class="style-control">
-					<label for="fg-color-input">字體顏色</label>
-					<input type="color" id="fg-color-input">
-				</div>
-				<div class="style-control">
-					<label for="bg-color-input">背景顏色</label>
-					<input type="color" id="bg-color-input">
-				</div>
-				<div class="style-control">
-					<label for="text-align-select">左右排版</label>
-					<select id="text-align-select">
-						<option value="left" selected>靠左</option>
-						<option value="center">置中</option>
-						<option value="right">靠右</option>
-					</select>
-				</div>
-				<div class="style-control">
-					<label for="vertical-align-select">上下排版</label>
-					<select id="vertical-align-select">
-						<option value="top">靠上</option>
-						<option value="center" selected>置中</option>
-						<option value="bottom">靠下</option>
-					</select>
-				</div>
-				<div class="style-control">
-					<label for="margin-input">左右留白 (px)</label>
-					<input type="number" id="margin-input" min="0" max="500" step="10" value="100">
-				</div>
-			</div>
-			
-			<div id="broadcast-panel" class="settings-panel" style="padding-top: 15px;">
-				<div class="style-control">
-					<label for="broadcast-mode-select">投放模式</label>
-					<select id="broadcast-mode-select">
-						<option value="manual" selected>人工投播</option>
-						<option value="automatic">自動最新行</option>
-						<option value="follow_cursor">跟隨游標</option>
-					</select>
-				</div>
-				<div class="style-control">
-					<label for="display-lines-input">顯示行數</label>
-					<input type="number" id="display-lines-input" min="1" max="10" value="1">
-				</div>
-				<div class="style-control">
-					<label for="transition-mode-select">過渡方式</label>
-					<select id="transition-mode-select">
-						<option value="direct" selected>直接切換</option>
-						<option value="fade">淡入淡出</option>
-						<option value="scroll">淡出滾動</option>
-						<option value="scroll-normal">正常滾動</option>
-					</select>
-				</div>
-			</div>
-			
-			<div class="config-buttons" style="margin-top: 20px;">
-				<button id="save-config-btn">儲存組態</button>
-				<button id="load-config-btn">載入組態</button>
-			</div>
-		</div>			
-           
-
+            <div class="settings-actions" style="margin-top: 8px; margin-bottom: 50px;">
+                <button id="settings-save-btn">匯出設定</button>
+                <button id="settings-load-btn">匯入設定</button>
+                <input id="settings-file-input" type="file" accept="application/json" style="display:none" />
+            </div>
         </div>
+
+        <!-- NOTE: 按鈕定位在主容器上，具可鍵盤操作與ARIA說明 -->
+        <div id="pane-toggle-btn" tabindex="0" role="button" aria-controls="settings-pane" aria-expanded="false" aria-label="展開設定">&laquo;</div>
     </div>
-
-	<div id="share-modal" class="modal-overlay" style="display: none;">
-		<div class="modal-content" style="padding: 30px; text-align: left;">
-			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-				<h4 style="margin: 0;">分享字幕給觀眾</h4>
-				<button id="share-modal-close-btn" style="border: none; background: none; font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
-			</div>
-			<p style="margin-top: 0;">點擊下方連結在新分頁開啟，或用手機掃描 QR Code 分享。</p>
-			<a href="#" id="viewer-link-anchor" target="_blank" rel="noopener noreferrer">正在產生連結...</a>
-			<div id="qrcode-container" style="margin: 20px auto 0 auto; min-width: 256px; min-height: 256px; display: flex; justify-content: center; align-items: center;"></div>
-		</div>
-	</div>
-
 
     <div id="import-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
@@ -578,279 +485,572 @@
                 <input type="text" id="replace-input" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
             </div>
             <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
-                 <button id="replace-cancel-btn" style="padding: 4px 8px; font-size: 14px; cursor: pointer;">取消</button>
-                 <button id="replace-all-btn" style="padding: 4px 8px; font-size: 14px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px;">全部置換</button>
+                 <button id="replace-cancel-btn">取消</button>
+                 <button id="replace-all-btn">全部置換</button>
             </div>
         </div>
     </div>
 
+    <div id="status">正在連線...</div>
 
-    
-    <div id="qrcode-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="padding: 30px;">
-            <h4>觀眾端連結 QR Code</h4>
-            <div id="qrcode-container" style="margin: 20px 0; min-width: 256px; min-height: 256px;"></div>
-            <button id="qrcode-close-btn">關閉</button>
+    <!-- 分享連結/QR Code Modal -->
+    <div id="share-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 520px; text-align: left;">
+            <h4 style="margin-top: 0;">分享觀眾連結</h4>
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+                <div id="share-qrcode" style="width:180px; height:180px; border:1px solid #eee;"></div>
+                <div style="flex:1;">
+                    <label style="display:block; font-size: 14px; color:#666; margin-bottom:6px;">觀眾端連結 (可點擊)</label>
+                    <!-- 將 input 替換為 a 標籤 -->
+                    <a id="share-link-anchor" href="#" target="_blank" rel="noopener noreferrer">正在產生連結...</a>
+                    <div style="margin-top:8px; display:flex; gap:8px;">
+                        <button id="share-copy-btn">複製連結</button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 16px; text-align: right;">
+                <button id="share-close-btn">關閉</button>
+            </div>
         </div>
     </div>
-
-    <div id="status">正在連線...</div>
     <input type="file" id="file-input" accept=".txt">
-    <input type="file" id="config-input" accept=".json">
 
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
-    <!-- [NEW] 引入 diff-match-patch JS 函式庫 -->
+    <!-- === 引入外部函式庫 === -->
     <script src="https://cdn.jsdelivr.net/gh/google/diff-match-patch@master/javascript/diff_match_patch.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const socket = io();
+            const socket = io({ transports: ["websocket"] });
             const ROOM_ID = "{{ room_id }}";
 
-            const controlPane = document.querySelector('.control-pane'),
-                  rightSidebarToggleBtn = document.getElementById('right-sidebar-toggle-btn'),
-                  editor = document.getElementById('script-editor'),
-                  lineNumbersDiv = document.getElementById('line-numbers'),
-                  lineMeasure = document.getElementById('line-measure'),
-                  statusDiv = document.getElementById('status'),
-                  currentSubtitleDiv = document.getElementById('current-subtitle').querySelector('span'),
-                  currentSubtitleContainer = document.getElementById('current-subtitle'),
-                  bookmarksList = document.getElementById('bookmarks-list'),
-                  clearBtn = document.getElementById('clear-btn'),
-                  importBtn = document.getElementById('import-btn'),
-                  exportBtn = document.getElementById('export-btn'),
-                  fileInput = document.getElementById('file-input'),
-                  fontVariantSelect = document.getElementById('font-variant-select'),
-                  fontSizeInput = document.getElementById('font-size-input'),
-                  fgColorInput = document.getElementById('fg-color-input'),
-                  bgColorInput = document.getElementById('bg-color-input'),
-                  fontFamilySelect = document.getElementById('font-family-select'),
-                  textAlignSelect = document.getElementById('text-align-select'),
-                  verticalAlignSelect = document.getElementById('vertical-align-select'),
-                  marginInput = document.getElementById('margin-input'),
-                  saveConfigBtn = document.getElementById('save-config-btn'),
-                  loadConfigBtn = document.getElementById('load-config-btn'),
-                  configInput = document.getElementById('config-input'),
-                  importModal = document.getElementById('import-modal'),
-                  importRawBtn = document.getElementById('import-raw-btn'),
-                  importSmartBtn = document.getElementById('import-smart-btn'),
-                  importCancelBtn = document.getElementById('import-cancel-btn'),
-                  replaceWordsBtn = document.getElementById('replace-words-btn'),
-                  replaceModal = document.getElementById('replace-modal'),
-                  findInput = document.getElementById('find-input'),
-                  replaceInput = document.getElementById('replace-input'),
-                  replaceAllBtn = document.getElementById('replace-all-btn'),
-                  replaceCancelBtn = document.getElementById('replace-cancel-btn'),
-                  bookmarkSidebar = document.getElementById('bookmark-sidebar'),				  
-                  sidebarToggleBtn = document.getElementById('sidebar-toggle-btn'),
-				  viewerLinkAnchor = document.getElementById('viewer-link-anchor'),                                    
-                  qrcodeContainer = document.getElementById('qrcode-container'),
-                  leaveRoomBtn = document.getElementById('leave-room-btn'),
-				  shareBtn = document.getElementById('share-btn'),
-				  shareModal = document.getElementById('share-modal'),
-				  shareModalCloseBtn = document.getElementById('share-modal-close-btn'),				  				  
-                  speechLangSelect = document.getElementById('speech-lang-select'),
-                  speechToggleBtn = document.getElementById('speech-toggle-btn'),
-                  speechStatus = document.getElementById('speech-status'),
-                  displayLinesInput = document.getElementById('display-lines-input'),
-                  transitionModeSelect = document.getElementById('transition-mode-select'),
-                  broadcastModeSelect = document.getElementById('broadcast-mode-select'),
-                  gotoFirstLineBtn = document.getElementById('goto-first-line-btn'),
-                  gotoLastLineBtn = document.getElementById('goto-last-line-btn');
+            // Editor and Collaboration Elements
+            const editor = document.getElementById('script-editor');
+            const statusDiv = document.getElementById('status');
+            const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+            
+            // File & Control Buttons
+            const clearBtn = document.getElementById('clear-btn');
+            const importBtn = document.getElementById('import-btn');
+            const exportBtn = document.getElementById('export-btn');
+            const fileInput = document.getElementById('file-input');
+            const importModal = document.getElementById('import-modal');
+            const importRawBtn = document.getElementById('import-raw-btn');
+            const importSmartBtn = document.getElementById('import-smart-btn');
+            const importCancelBtn = document.getElementById('import-cancel-btn');
+            const replaceWordsBtn = document.getElementById('replace-words-btn');
+            const replaceModal = document.getElementById('replace-modal');
+            const findInput = document.getElementById('find-input');
+            const replaceInput = document.getElementById('replace-input');
+            const replaceAllBtn = document.getElementById('replace-all-btn');
+            const replaceCancelBtn = document.getElementById('replace-cancel-btn');
+            const leaveRoomBtn = document.getElementById('leave-room-btn');
+            const speechLangSelect = document.getElementById('speech-lang-select');
+            const shareViewerBtn = document.getElementById('share-viewer-btn');
+            const speechToggleBtn = document.getElementById('speech-toggle-btn');
+            const shareModal = document.getElementById('share-modal');
+            const shareLinkAnchor = document.getElementById('share-link-anchor');  // 修改變數名稱和 ID
+            const shareCopyBtn = document.getElementById('share-copy-btn');
+			const shareCloseBtn = document.getElementById('share-close-btn'); 
+            const shareQrCodeContainer = document.getElementById('share-qrcode');
 
-            // [NEW] diff-match-patch 相關變數
-            let dmp;
-            try {
-                dmp = new diff_match_patch();
-                console.log('diff-match-patch 載入成功');
-            } catch (error) {
-                console.error('diff-match-patch 載入失敗:', error);
-                // 如果載入失敗，使用備用方案
-                dmp = null;
-            }
-            let lastSentText = ''; // 用於生成 patch 的前一個文本狀態
+            // --- Director Style Settings Elements ---
+            const directorFontFamilySelect = document.getElementById('director-font-family-select');
+            const directorFontSizeInput = document.getElementById('director-font-size-input');
+            const directorFontStyleSelect = document.getElementById('director-font-style-select');
+            const directorFontColorInput = document.getElementById('director-font-color-input');
+            const directorBgColorInput = document.getElementById('director-bg-color-input');
+            const directorLineHeightInput = document.getElementById('director-line-height-input');
+			const directorSpeechBreakMode = document.getElementById('director-speech-break-mode');
+            // --- Viewer Style Settings Elements ---
+            const viewerFontFamilySelect = document.getElementById('viewer-font-family-select');
+            const viewerFontSizeInput = document.getElementById('viewer-font-size-input');
+            const viewerFontStyleSelect = document.getElementById('viewer-font-style-select');
+            const viewerFontColorInput = document.getElementById('viewer-font-color-input');
+            const viewerBgColorInput = document.getElementById('viewer-bg-color-input');
+            const viewerLineHeightInput = document.getElementById('viewer-line-height-input');
+
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const settingsSaveBtn = document.getElementById('settings-save-btn');
+            const settingsLoadBtn = document.getElementById('settings-load-btn');
+            const settingsFileInput = document.getElementById('settings-file-input');
+
+            // Collaboration State
+            let dmp = new diff_match_patch();
+            let lastSentText = '';
             let patchUpdateTimeout;
-
-            let localState = { raw_text: '', lines: [], bookmarks: {}, current_index: 0, style_settings: {}, push_settings: {} };
-            let editorUpdateTimeout;
-            let collaborationUpdateTimeout;
-            let cursorSyncTimeout;
+            let localState = { raw_text: '' };
             let importedFileContent = '';
-            let heartbeatInterval;
-            let lastPongTime = Date.now();
-            let isBlanked = false;
-            let recognition = null;
-            let isRecording = false;
-            let finalTranscript = '';
-            let interimTranscript = '';
-            let punctuationMarks = /[,.;:!?\uff0c\u3002\u3001?!;:]/;
-            let sentenceEndings = /[.!?\uff01\uff1f\u3002]/;
-            let lastSpeechTime = 0;
-            let silenceTimer = null;
-            let pendingText = '';
-            let interimUpdateDelay = 100;
-            let interimPushDelay = 200;
-            let finalUpdateDelay = 300;
-            let finalPushDelay = 100;
-            let editorUpdateDebounce = 1000;
-            let microPauseThreshold = 200;
-            let shortPauseThreshold = 400;
-            let mediumPauseThreshold = 1200;
-            let longPauseThreshold = 2500;
-            let silenceCheckInterval = 150;
-            let editorUpdateTimer = null;
-            let pushUpdateTimer = null;
-            let currentInterimText = '';
-            let commaCount = 0;
-            let maxLineLength = 30;
-            let updateTimeout = null;
-            let resizeTimeout = null;
-            
-            // 快捷輸入功能
-            let quickInputs = {};
-            let isEditing = false;
-            
-            // 初始化分頁切換功能
-            function initSidebarTabs() {
-                const tabs = document.querySelectorAll('.sidebar-tab');
-                const panes = document.querySelectorAll('.tab-pane');
-                
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        // 移除所有活動狀態
-                        tabs.forEach(t => t.classList.remove('active'));
-                        panes.forEach(p => p.classList.remove('active'));
-                        
-                        // 設置新的活動狀態
-                        tab.classList.add('active');
-                        const targetTab = tab.getAttribute('data-tab');
-                        document.getElementById(targetTab + '-tab').classList.add('active');
-                    });
-                });
-            }
-            
-            // 初始化快捷輸入功能
-            function initQuickInputs() {
-                const quickInputFields = document.querySelectorAll('.quick-input-field');
-                
-                // 監聽輸入框變化
-                quickInputFields.forEach(field => {
-                    field.addEventListener('input', () => {
-                        const key = field.getAttribute('data-key');
-                        quickInputs[key] = field.value;
-                        
-                        // 發送到服務器
-                        socket.emit('update_quick_inputs', {
-                            room: ROOM_ID,
-                            inputs: quickInputs
-                        });
-                    });
-                });
-                
-                // 監聽快捷鍵
-                document.addEventListener('keydown', (e) => {
-                    // 只在編輯模式下且按下 Ctrl 鍵時處理
-                    if (!isEditing || !e.ctrlKey) return;
-                    
-                    let keyNumber = null;
-                    if (e.key >= '1' && e.key <= '9') {
-                        keyNumber = e.key;
-                    } else if (e.key === '0') {
-                        keyNumber = '10';
-                    }
-                    
-                    // 如果是我們定義的快捷鍵範圍，無論是否有內容都要阻止默認行為
-                    if (keyNumber) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        // 只有當快捷輸入有內容時才插入文字
-                        if (quickInputs[keyNumber] && quickInputs[keyNumber].trim() !== '') {
-                            insertTextAtCursor(quickInputs[keyNumber]);
-                        }
-                        // 如果沒有內容，什麼都不做，但已經阻止了默認行為
-                    }
-                });
-            }
-            
-            // 在游標位置插入文字
-            function insertTextAtCursor(text) {
-                const start = editor.selectionStart;
-                const end = editor.selectionEnd;
-                const currentValue = editor.value;
-                
-                editor.value = currentValue.substring(0, start) + text + currentValue.substring(end);
-                editor.selectionStart = editor.selectionEnd = start + text.length;
-                
-                // 觸發編輯器更新
-                handleEditorChange();
-            }
-            
-            // 更新快捷輸入字段顯示
-            function updateQuickInputFields() {
-                const quickInputFields = document.querySelectorAll('.quick-input-field');
-                quickInputFields.forEach(field => {
-                    const key = field.getAttribute('data-key');
-                    if (quickInputs[key]) {
-                        field.value = quickInputs[key];
-                    }
-                });
-            }
-            
-            // 編輯器焦點事件處理
-            function setupEditorEvents() {
-                editor.addEventListener('focus', () => {
-                    isEditing = true;
-                });
-                
-                editor.addEventListener('blur', () => {
-                    isEditing = false;
-                });
-            }
-
-            class LineHeightCalculator {
-                constructor(editor, measureDiv) {
-                    this.editor = editor;
-                    this.measureDiv = measureDiv;
-                    this.baseLineHeight = 0;
-                    this.setupMeasureDiv();
-                }
-                
-                setupMeasureDiv() {
-                    const editorStyles = window.getComputedStyle(this.editor);
-                    this.measureDiv.style.font = editorStyles.font;
-                    this.measureDiv.style.lineHeight = editorStyles.lineHeight;
-                    this.measureDiv.style.padding = `0 ${editorStyles.paddingRight} 0 ${editorStyles.paddingLeft}`;
-                    this.measureDiv.style.width = this.editor.clientWidth + 'px';
-                    this.measureDiv.style.letterSpacing = editorStyles.letterSpacing;
-                    this.measureDiv.style.wordSpacing = editorStyles.wordSpacing;
-                    this.measureDiv.style.boxSizing = editorStyles.boxSizing;
-                    this.baseLineHeight = parseFloat(editorStyles.lineHeight) || 1;
-                }
-                
-                measureLines(lines) {
-                    const lineMetrics = [];
-                    for (const line of lines) {
-                        this.measureDiv.textContent = line || ' ';
-                        const visualHeight = this.measureDiv.offsetHeight;
-                        const visualLines = this.baseLineHeight > 0 ? Math.max(1, Math.round(visualHeight / this.baseLineHeight)) : 1;
-                        lineMetrics.push({
-                            height: visualHeight,
-                            lines: visualLines
-                        });
-                    }
-                    return lineMetrics;
-                }
-            }
-
             let latency = 0;
             let connectionCounts = null;
 
+            // --- Auto-scroll Logic ---
+            function isScrolledToBottom(el) {
+                const threshold = 5; // 像素容錯值
+                return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+            }
+
+            function scrollToBottom(el) {
+                el.scrollTop = el.scrollHeight;
+            }
+
+            function handleEditorScroll() {
+                if (isScrolledToBottom(editor)) {
+                    scrollToBottomBtn.classList.remove('visible');
+                } else {
+                    scrollToBottomBtn.classList.add('visible');
+                }
+            }
+            
+            function wrapUpdateFunction(updateFn) {
+                return function(...args) {
+                    const shouldScroll = isScrolledToBottom(editor);
+                    updateFn(...args);
+                    if (shouldScroll) {
+                        setTimeout(() => scrollToBottom(editor), 0);
+                    }
+                    handleEditorScroll();
+                }
+            }
+
+            // --- Style Settings Logic (Refactored) ---
+            document.addEventListener('keydown', (e) => {
+                // Esc to close modals
+                if (e.key === 'Escape') {
+                    let modalWasClosed = false;
+                    if (importModal.style.display !== 'none') {
+                        importModal.style.display = 'none';
+                        modalWasClosed = true;
+                    }
+                    if (replaceModal.style.display !== 'none') {
+                        replaceModal.style.display = 'none';
+                        modalWasClosed = true;
+                    }
+                    if (shareModal.style.display !== 'none') {
+                        shareModal.style.display = 'none';
+                        modalWasClosed = true;
+                    }
+                    if (modalWasClosed) {
+                        e.preventDefault();
+                        return; // Stop further key processing if a modal was closed
+                    }
+                }
+
+                const isCtrl = e.ctrlKey || e.metaKey;
+                if (!isCtrl) return;
+
+                // Ctrl+H to open Replace modal
+                if (e.key.toLowerCase() === 'h') {
+                    e.preventDefault();
+                    replaceWordsBtn.click();
+                    return;
+                }
+
+                const plusPressed = e.key === '=' || e.key === '+';
+                const minusPressed = e.key === '-' || e.key === '_';
+                if (!plusPressed && !minusPressed) return;
+                e.preventDefault();
+                const current = parseInt(directorFontSizeInput.value, 10) || 24;
+                const delta = plusPressed ? 2 : -2;
+                const next = Math.min(72, Math.max(8, current + delta));
+                directorFontSizeInput.value = next;
+                saveDirectorSettings();
+            });
+
+            function applyDirectorSettings() {
+                const settings = {
+                    fontFamily: directorFontFamilySelect.value,
+                    fontSize: `${directorFontSizeInput.value}px`,
+                    lineHeight: directorLineHeightInput.value,
+                    fontStyle: directorFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+                    fontWeight: directorFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+                    color: directorFontColorInput.value,
+                    backgroundColor: directorBgColorInput.value
+                };
+
+                editor.style.fontFamily = settings.fontFamily;
+                editor.style.fontSize = settings.fontSize;
+                editor.style.lineHeight = settings.lineHeight;
+                editor.style.fontStyle = settings.fontStyle;
+                editor.style.fontWeight = settings.fontWeight;
+                editor.style.color = settings.color;
+                editor.style.backgroundColor = settings.backgroundColor;
+                
+                return settings;
+            }
+
+            function saveDirectorSettings() {
+                const settings = {
+					fontFamily: directorFontFamilySelect.value,
+					fontSize: `${directorFontSizeInput.value}px`,
+					lineHeight: directorLineHeightInput.value,
+					fontStyle: directorFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+					fontWeight: directorFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+					color: directorFontColorInput.value,
+					backgroundColor: directorBgColorInput.value,
+					speechBreakMode: directorSpeechBreakMode.value
+				};
+                localStorage.setItem('directorEditorSettings', JSON.stringify(settings));
+                try {
+                    socket.emit('update_director_settings', {
+                        room: ROOM_ID,
+                        settings: { ...settings, theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light' }
+                    });
+                } catch(e) {}
+            }
+            
+			function saveViewerSettings() {
+                const settings = {
+                    fontFamily: viewerFontFamilySelect.value,
+                    fontSize: `${viewerFontSizeInput.value}px`,
+                    lineHeight: viewerLineHeightInput.value,
+                    fontStyle: viewerFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+                    fontWeight: viewerFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+                    color: viewerFontColorInput.value,
+                    backgroundColor: viewerBgColorInput.value
+                };
+                localStorage.setItem('viewerEditorSettings', JSON.stringify(settings));
+                
+                const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+                
+                try {
+                    socket.emit('update_viewer_settings', { 
+                        room: ROOM_ID, 
+                        settings: { ...settings, theme: currentTheme } 
+                    });
+                } catch(e) {}
+            }
+
+            function exportSettingsToJson() {
+                const settings = {
+                    director: JSON.parse(localStorage.getItem('directorEditorSettings') || '{}'),
+                    viewer: JSON.parse(localStorage.getItem('viewerEditorSettings') || '{}'),
+                    theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light'
+                };
+                const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'editor-settings.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            }
+            
+            function updateDirectorControls(settings) {
+                if (!settings) return;
+                directorFontFamilySelect.value = settings.fontFamily || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
+                directorFontSizeInput.value = parseInt(settings.fontSize, 10) || 24;
+                directorLineHeightInput.value = settings.lineHeight || 1.2;
+                if (settings.fontWeight === 'bold') {
+                    directorFontStyleSelect.value = 'bold';
+                } else if (settings.fontStyle === 'italic') {
+                    directorFontStyleSelect.value = 'italic';
+                } else {
+                    directorFontStyleSelect.value = 'normal';
+                }
+                directorFontColorInput.value = settings.color || '#000000';
+                directorBgColorInput.value = settings.backgroundColor || '#FFFFFF';
+				
+				directorSpeechBreakMode.value = settings.speechBreakMode || 'double-newline';
+                applyDirectorSettings();
+            }
+
+            function updateViewerControls(settings) {
+                if (!settings) return;
+                viewerFontFamilySelect.value = settings.fontFamily || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
+                viewerFontSizeInput.value = parseInt(settings.fontSize, 10) || 40;
+                viewerLineHeightInput.value = settings.lineHeight || 1.4;
+                if (settings.fontWeight === 'bold') {
+                    viewerFontStyleSelect.value = 'bold';
+                } else if (settings.fontStyle === 'italic') {
+                    viewerFontStyleSelect.value = 'italic';
+                } else {
+                    viewerFontStyleSelect.value = 'normal';
+                }
+                viewerFontColorInput.value = settings.color || '#FFFFFF';
+                viewerBgColorInput.value = settings.backgroundColor || '#000000';
+            }
+
+            function importSettingsFromJson(jsonText) {
+                try {
+                    const settingsBundle = JSON.parse(jsonText);
+                    if (settingsBundle.director) {
+                        updateDirectorControls(settingsBundle.director);
+                        saveDirectorSettings();
+                    }
+                    if (settingsBundle.viewer) {
+                        updateViewerControls(settingsBundle.viewer);
+                        saveViewerSettings();
+                    }
+                    if (settingsBundle.theme) {
+                        localStorage.setItem('editorTheme', settingsBundle.theme);
+                        applyTheme(settingsBundle.theme);
+                    }
+                } catch (e) {
+                    alert('設定檔格式有誤，請確認為有效的 JSON。');
+                }
+            }
+
+            function loadSettings() {
+                const savedDirectorSettings = localStorage.getItem('directorEditorSettings');
+                if (savedDirectorSettings) {
+                    updateDirectorControls(JSON.parse(savedDirectorSettings));
+                }
+                const savedViewerSettings = localStorage.getItem('viewerEditorSettings');
+                 if (savedViewerSettings) {
+                    updateViewerControls(JSON.parse(savedViewerSettings));
+                }
+                applyDirectorSettings();
+            }
+            
+            // --- Handler function to apply AND save director settings ---
+            function handleDirectorSettingsChange() {
+                applyDirectorSettings(); // 步驟 1: 立即將樣式應用到畫面上，提供即時反饋
+                saveDirectorSettings();  // 步驟 2: 保存設定並廣播給協作者
+            }
+
+            // Bind the new handler to all director controls
+            [directorFontFamilySelect, directorFontSizeInput, directorFontStyleSelect, directorFontColorInput, directorBgColorInput, directorLineHeightInput, directorSpeechBreakMode].forEach(el => {
+                // 使用 'input' 事件可以同時捕捉到數字輸入、顏色選擇和下拉選單的變更
+                el.addEventListener('input', handleDirectorSettingsChange);
+            });
+
+            // Viewer settings logic remains unchanged, as it doesn't need to apply locally.
+            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput].forEach(el => {
+                el.addEventListener('input', saveViewerSettings);
+            });
+
+            // --- Dark Mode Logic ---
+			function applyTheme(theme) {
+                if (theme === 'dark') {
+                    // --- 導播端 (index.html) ---
+                    document.body.classList.add('dark-mode');
+                    directorFontColorInput.value = '#e0e0e0'; // 編輯區：灰白字
+                    directorBgColorInput.value = '#2c2c2c';  // 編輯區：深灰底
+
+                    // --- 觀眾端 (viewer.html) ---
+                    // 【修復問題2】無條件重置為「夜間模式預設值」
+                    viewerFontColorInput.value = '#ffff00'; // 觀眾端：黃字
+                    viewerBgColorInput.value = '#000000';  // 觀眾端：黑底
+
+                } else { // 切換到白天模式
+                    // --- 導播端 (index.html) ---
+                    document.body.classList.remove('dark-mode');
+                    directorFontColorInput.value = '#000000'; // 編輯區：黑字
+                    directorBgColorInput.value = '#FFFFFF';  // 編輯區：白底
+
+                    // --- 觀眾端 (viewer.html) ---
+                    // 【修復問題1的連帶問題】無條件重置為「白天模式預設值」
+                    viewerFontColorInput.value = '#000000'; // 觀眾端：黑字
+                    viewerBgColorInput.value = '#FFFFFF';  // 觀眾端：白底
+                }
+
+                // 在設定完所有顏色值之後，一次性保存、廣播並應用
+                saveDirectorSettings(); // 保存並廣播導播端設定
+                saveViewerSettings();   // 保存並廣播【已重置】的觀眾端設定
+				
+                // 【修復問題1】將導播端的樣式實際應用到畫面上
+				applyDirectorSettings();
+            }
+
+            darkModeToggle.addEventListener('click', () => {
+                const isDarkMode = document.body.classList.contains('dark-mode');
+                const newTheme = isDarkMode ? 'light' : 'dark';
+                localStorage.setItem('editorTheme', newTheme);
+                applyTheme(newTheme);
+            });
+
+            // --- Pane Collapse Logic ---
+            const paneToggleBtn = document.getElementById('pane-toggle-btn');
+            const mainContainer = document.querySelector('.main-container');
+            const settingsPane = document.getElementById('settings-pane');
+
+            function updatePaneTogglePosition() {
+                if (mainContainer.classList.contains('settings-collapsed')) {
+                    paneToggleBtn.style.right = '0px';
+                    return;
+                }
+                const paneWidth = Math.round(settingsPane.getBoundingClientRect().width);
+                const safeWidth = Math.max(0, paneWidth);
+                paneToggleBtn.style.right = `${safeWidth}px`;
+            }
+
+            function updatePaneToggleAria() {
+                const isCollapsed = mainContainer.classList.contains('settings-collapsed');
+                paneToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+                paneToggleBtn.setAttribute('aria-label', isCollapsed ? '展開設定' : '收合設定');
+            }
+
+            function toggleSettingsPane() {
+                const isCollapsed = mainContainer.classList.toggle('settings-collapsed');
+                paneToggleBtn.innerHTML = isCollapsed ? '&laquo;' : '&raquo;';
+                updatePaneToggleAria();
+                updatePaneTogglePosition();
+                setTimeout(updatePaneTogglePosition, 320);
+            }
+
+            window.addEventListener('resize', updatePaneTogglePosition);
+            settingsPane.addEventListener('transitionend', updatePaneTogglePosition);
+            paneToggleBtn.addEventListener('click', toggleSettingsPane);
+            paneToggleBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleSettingsPane();
+                }
+            });
+
+            updatePaneTogglePosition();
+            updatePaneToggleAria();
+
+            // --- Snippets Panel Logic (Left) ---
+            const snippetsPane = document.getElementById('snippets-pane');
+            const snippetsToggleBtn = document.getElementById('snippets-toggle-btn');
+            const snippetsClearBtn = document.getElementById('snippets-clear-btn');
+            const snippetTextareas = [
+                document.getElementById('snippet-1'),
+                document.getElementById('snippet-2'),
+                document.getElementById('snippet-3'),
+                document.getElementById('snippet-4'),
+                document.getElementById('snippet-5'),
+                document.getElementById('snippet-6'),
+                document.getElementById('snippet-7'),
+                document.getElementById('snippet-8'),
+                document.getElementById('snippet-9'),
+                document.getElementById('snippet-0'),
+            ];
+
+            function loadSnippets() {
+                try {
+                    const raw = localStorage.getItem('editorSnippets') || '{}';
+                    const data = JSON.parse(raw);
+                    snippetTextareas.forEach((ta, idx) => {
+                        const key = idx === 9 ? '0' : String(idx + 1);
+                        ta.value = data[key] || '';
+                    });
+                } catch (e) {}
+            }
+
+            function saveSnippets() {
+                try {
+                    const data = {};
+                    snippetTextareas.forEach((ta, idx) => {
+                        const key = idx === 9 ? '0' : String(idx + 1);
+                        data[key] = ta.value || '';
+                    });
+                    localStorage.setItem('editorSnippets', JSON.stringify(data));
+                } catch (e) {}
+            }
+
+            /**
+             * 以伺服器的 quick_inputs 為權威來源同步片段嘅 UI
+             * 用於斷線重連、多瀏覽器協作時確保狀態一致
+             * @param {Object} serverInputs - 從 state_update 收到的 quick_inputs
+             */
+            function syncSnippetsFromServer(serverInputs) {
+                if (!serverInputs || typeof serverInputs !== 'object') return;
+                try {
+                    // NOTE: 判斷是否與目前本地不同，相同則跳過避免不必要的 DOM 操作
+                    const localRaw = localStorage.getItem('editorSnippets') || '{}';
+                    const localData = JSON.parse(localRaw);
+                    const hasChange = snippetTextareas.some((ta, idx) => {
+                        const key = idx === 9 ? '0' : String(idx + 1);
+                        return (serverInputs[key] || '') !== (localData[key] || '');
+                    });
+                    if (!hasChange) return;
+
+                    // 將伺服器版本寫入 UI 和 localStorage
+                    snippetTextareas.forEach((ta, idx) => {
+                        const key = idx === 9 ? '0' : String(idx + 1);
+                        ta.value = serverInputs[key] || '';
+                    });
+                    localStorage.setItem('editorSnippets', JSON.stringify(serverInputs));
+                } catch(e) {}
+            }
+
+            function updateSnippetsTogglePosition() {
+                if (mainContainer.classList.contains('snippets-collapsed')) {
+                    snippetsToggleBtn.style.left = '0px';
+                    return;
+                }
+                const width = Math.round(snippetsPane.getBoundingClientRect().width);
+                snippetsToggleBtn.style.left = `${Math.max(0, width)}px`;
+            }
+
+            function updateSnippetsToggleAria() {
+                const isCollapsed = mainContainer.classList.contains('snippets-collapsed');
+                snippetsToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+                snippetsToggleBtn.setAttribute('aria-label', isCollapsed ? '展開片段' : '收合片段');
+            }
+
+            function toggleSnippetsPane() {
+                const isCollapsed = mainContainer.classList.toggle('snippets-collapsed');
+                snippetsToggleBtn.innerHTML = isCollapsed ? '&raquo;' : '&laquo;';
+                updateSnippetsToggleAria();
+                updateSnippetsTogglePosition();
+                setTimeout(updateSnippetsTogglePosition, 320);
+            }
+
+            window.addEventListener('resize', updateSnippetsTogglePosition);
+            snippetsPane.addEventListener('transitionend', updateSnippetsTogglePosition);
+            snippetsToggleBtn.addEventListener('click', toggleSnippetsPane);
+            snippetsToggleBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSnippetsPane(); }
+            });
+
+            snippetTextareas.forEach(ta => ta.addEventListener('input', saveSnippets));
+            if (snippetsClearBtn) {
+                snippetsClearBtn.addEventListener('click', () => {
+                    if (!window.confirm('確定清空所有片段嗎？')) return;
+                    snippetTextareas.forEach(ta => ta.value = '');
+                    saveSnippets();
+                });
+            }
+            document.querySelectorAll('.snippet-insert-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-snippet');
+                    const ta = document.getElementById(`snippet-${id}`);
+                    const text = ta ? ta.value : '';
+                    if (!text) return;
+                    editor.focus();
+                    insertAtCursor(editor, text);
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
+
+            function getSnippetTextByDigit(digit) {
+                const id = digit === '0' ? '0' : digit;
+                const ta = document.getElementById(`snippet-${id}`);
+                return ta ? (ta.value || '') : '';
+            }
+
+            function handleSnippetHotkeys(e) {
+                const isCtrl = e.ctrlKey || e.metaKey;
+                if (!isCtrl) return;
+                const key = e.key;
+                if (!/^[0-9]$/.test(key)) return;
+                const active = document.activeElement;
+                if (active !== editor) return;
+                e.preventDefault();
+                try { e.stopPropagation(); e.stopImmediatePropagation(); } catch(_) {}
+                const text = getSnippetTextByDigit(key);
+                if (text) {
+                    insertAtCursor(editor, text);
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+            document.addEventListener('keydown', handleSnippetHotkeys, true);
+
+            loadSnippets();
+            updateSnippetsTogglePosition();
+            updateSnippetsToggleAria();
+
+            // --- Core Application Logic ---
             function updateStatusDisplay() {
                 if (socket.connected) {
                     let statusText = `已連線 ✅ (${latency}ms)`;
                     if (connectionCounts) {
-                        statusText += ` / 導播端 ${connectionCounts.directors}人 / 觀眾端 ${connectionCounts.viewers}人`;
+                        statusText += ` / 在線人數: ${connectionCounts.directors}人`;
                     }
                     statusDiv.textContent = statusText;
                 } else {
@@ -858,555 +1058,229 @@
                 }
             }
 
-            socket.on('connect', () => { 
-                statusDiv.textContent = '已連線 ✅'; 
-                socket.emit('join', { room: ROOM_ID, client_type: 'director' }); 
-                startHeartbeat();
-                initSidebarTabs();
-                initQuickInputs();
-                setupEditorEvents();
+            socket.on('connect', () => {
+                statusDiv.textContent = '已連線 ✅';
+                socket.emit('join', { room: ROOM_ID });
+                
+                loadSettings();
+                const savedTheme = localStorage.getItem('editorTheme') || 'light';
+                applyTheme(savedTheme);
+                saveDirectorSettings();
+                saveViewerSettings();
             });
-            socket.on('disconnect', () => { 
-                statusDiv.textContent = '連線中斷 ❌'; 
-                connectionCounts = null;
-                stopHeartbeat();
-            });
-            socket.on('state_update', (newState) => { 
-                const oldIndex = localState.current_index;
-                const oldDisplayLines = localState.push_settings?.display_lines;
-                const oldRawText = localState.raw_text;
-                
-                localState = newState;
-                
-                // 更新快捷輸入數據
-                if (newState.quick_inputs) {
-                    quickInputs = newState.quick_inputs;
-                    updateQuickInputFields();
-                }
-                
-                // [MODIFIED] 初始化或重置用於 patch 的文本
-                lastSentText = newState.raw_text;
 
-                updateUI(oldIndex !== newState.current_index || oldDisplayLines !== newState.push_settings?.display_lines);
-                if (editor.value !== oldRawText) {
-                    scheduleLineNumberUpdate();
+            socket.on('disconnect', () => {
+                statusDiv.textContent = '連線中斷 ❌';
+                connectionCounts = null;
+            });
+
+            socket.on('state_update', wrapUpdateFunction((newState) => {
+                localState = newState;
+                if (newState) {
+                    if (newState.viewer_id) {
+                        try { localStorage.setItem('viewerId_' + ROOM_ID, newState.viewer_id); } catch(_) {}
+                    }
+                    updateDirectorControls(newState.director_settings);
+                    updateViewerControls(newState.viewer_settings);
+                    applyTheme(newState.director_settings?.theme || 'light');
+                    // NOTE: 以伺服器片段資料為權威來源，同步到本地 UI
+                    syncSnippetsFromServer(newState.quick_inputs);
+                }
+
+                lastSentText = newState.raw_text;
+				if (isComposing) return;
+                if (editor.value !== newState.raw_text) {
+                    const cursorPos = editor.selectionStart;
+                    editor.value = newState.raw_text;
+                    try { editor.selectionStart = editor.selectionEnd = Math.min(cursorPos, editor.value.length); } catch (e) {}
+                }
+            }));
+            
+            socket.on('viewer_settings_update', (data) => {
+                if (data && data.settings) {
+                    updateViewerControls(data.settings);
+                    localStorage.setItem('viewerEditorSettings', JSON.stringify(data.settings));
                 }
             });
-            socket.on('pong', (data) => { 
-                lastPongTime = Date.now();
-                latency = lastPongTime - data.timestamp;
+
+            setInterval(() => {
+                try { socket.emit('ping', { timestamp: Date.now() }); } catch(e) {}
+            }, 5000);
+
+            socket.on('pong', (data) => {
+                latency = Date.now() - data.timestamp;
                 updateStatusDisplay();
             });
 
-            // [NEW] 監聽連線數更新
             socket.on('connection_update', (counts) => {
                 connectionCounts = counts;
                 updateStatusDisplay();
             });
 
-            // [NEW] 監聽來自伺服器的文本補丁
-            socket.on('script_patched', (data) => {
-                if (!dmp) {
-                    console.error('diff-match-patch 未載入，無法處理補丁');
-                    // 請求完整狀態同步
-                    socket.emit('join', { room: ROOM_ID });
-                    return;
-                }
-
+            socket.on('script_patched', wrapUpdateFunction((data) => {
+				if (isComposing) return;
                 const patch_text = data.patch;
                 const oldText = editor.value;
                 const oldCursorPos = editor.selectionStart;
-
                 try {
-                    // 應用補丁
                     const patches = dmp.patch_fromText(patch_text);
                     const [newText, results] = dmp.patch_apply(patches, oldText);
-
                     if (results.some(res => !res)) {
-                        // 如果補丁應用失敗，向伺服器請求完整狀態以強制同步
-                        console.error("本地補丁應用失敗，請求完整狀態。");
-                        socket.emit('join', { room: ROOM_ID }); // 重新加入以獲取最新狀態
+                        socket.emit('join', { room: ROOM_ID });
                         return;
                     }
-
-                    // 更新文本
                     editor.value = newText;
-                    lastSentText = newText; // 同步本地的 patch 基準文本
-
-                    // 智能計算並恢復游標位置
+                    lastSentText = newText;
                     const diffs = dmp.diff_main(oldText, newText);
                     const newCursorPos = dmp.diff_xIndex(diffs, oldCursorPos);
                     editor.selectionStart = editor.selectionEnd = newCursorPos;
-                    
-                    // 手動觸發UI更新
-                    scheduleLineNumberUpdate();
-                    autoFollowCurrentLine(); // 如果需要，更新高亮行
                 } catch (error) {
-                    console.error('處理補丁時發生錯誤:', error);
-                    // 發生錯誤時請求完整狀態同步
                     socket.emit('join', { room: ROOM_ID });
                 }
+            }));
+
+            let isComposing = false;
+            editor.addEventListener('compositionstart', () => { isComposing = true; });
+            editor.addEventListener('compositionend', () => { 
+                isComposing = false; 
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
             });
 
-            socket.on('cursor_update', (data) => {
-                const broadcastMode = localState.push_settings?.broadcast_mode || 'manual';
-                if (broadcastMode === 'follow_cursor' && data.cursor_pos !== undefined) {
-                    if (editor.selectionStart !== data.cursor_pos || editor.selectionEnd !== data.cursor_pos) {
-                        try {
-                            const currentScrollTop = editor.scrollTop;
-                            editor.selectionStart = editor.selectionEnd = data.cursor_pos;
-                            editor.scrollTop = currentScrollTop;
-                        } catch(e) { console.error("Failed to sync cursor position:", e); }
-                    }
-                }
-            });
-
-
-            const settingsTabs = document.querySelectorAll('.settings-tab');
+            // NEW: Function to check if cursor is in reserved area
+            function isInReservedArea(position) {
+                if (speechReservedLines === 0) return false;
+                const text = editor.value;
+                const lastContentPos = findLastContentPosition();
+                return position > lastContentPos && position <= text.length;
+            }
             
-
+            // NEW: Function to restrict editing in reserved areas
+            function preventReservedAreaEditing(e) {
+                if (speechReservedLines === 0) return;
+                
+                const selStart = editor.selectionStart;
+                const selEnd = editor.selectionEnd;
+                
+                // Check if selection includes reserved area
+                if (isInReservedArea(selStart) || isInReservedArea(selEnd)) {
+                    // Move cursor to last content position
+                    const lastContentPos = findLastContentPosition();
+                    setTimeout(() => {
+                        editor.selectionStart = editor.selectionEnd = Math.max(0, lastContentPos);
+                    }, 0);
+                    
+                    // Prevent the input if it would modify reserved area
+                    if (e && (e.type === 'keydown' || e.type === 'input')) {
+                        e.preventDefault();
+                        return false;
+                    }
+                }
+                return true;
+            }
             
-            settingsTabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    settingsTabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.querySelectorAll('.settings-panel').forEach(panel => panel.classList.remove('active'));
-                    const panelId = tab.getAttribute('data-panel');
-                    document.getElementById(panelId).classList.add('active');
-                });
+            // Add event listeners for reserved area protection
+            editor.addEventListener('keydown', (e) => {
+                // Allow navigation keys
+                const navigationKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'];
+                if (navigationKeys.includes(e.key)) {
+                    return;
+                }
+                
+                // Prevent typing in reserved area
+                if (!preventReservedAreaEditing(e)) {
+                    return;
+                }
             });
             
-            // [MODIFIED] 移除或註解掉舊的 editor_update 監聽器，因為 patch 機制已取代它
-            /*
-            socket.on('editor_update', (data) => {
-                // ... 這個區塊的邏輯現在由 'script_patched' 處理
+            editor.addEventListener('click', () => {
+                setTimeout(() => preventReservedAreaEditing(), 0);
             });
-            */
-
-            function startHeartbeat() {
-                stopHeartbeat();
-                heartbeatInterval = setInterval(() => {
-                    const now = Date.now();
-                    socket.emit('ping', { room: ROOM_ID, timestamp: now });
-                    if (now - lastPongTime > 10000) {
-                        statusDiv.textContent = '連線異常 ⚠️';
-                    }
-                }, 60000);
-            }
-
-            function stopHeartbeat() {
-                if (heartbeatInterval) {
-                    clearInterval(heartbeatInterval);
-                    heartbeatInterval = null;
-                }
-            }
-
-            function getPushOptions() {
-                return {
-                    display_lines: parseInt(displayLinesInput.value) || 1,
-                    transition_mode: transitionModeSelect.value
-                };
-            }
-
-            function compensateForScrollbars() {
-                requestAnimationFrame(() => {
-                    const originalPaddingRight = '5px';
-                    const originalPaddingBottom = '10px';
-                    lineNumbersDiv.style.paddingRight = originalPaddingRight;
-                    lineNumbersDiv.style.paddingBottom = originalPaddingBottom;
-                    const scrollbarWidth = editor.offsetWidth - editor.clientWidth;
-                    const scrollbarHeight = editor.offsetHeight - editor.clientHeight;
-                    if (scrollbarWidth > 1) {
-                        lineNumbersDiv.style.paddingRight = `${parseInt(originalPaddingRight) + scrollbarWidth}px`;
-                    }
-                    if (scrollbarHeight > 1) {
-                        lineNumbersDiv.style.paddingBottom = `${parseInt(originalPaddingBottom) + scrollbarHeight}px`;
-                    }
-                });
-            }
-
-            function updateUI(indexChanged = false) {
-                if (document.activeElement !== editor && editor.value !== localState.raw_text) {
-                    const cursorPos = editor.selectionStart;
-                    editor.value = localState.raw_text;
-                    try { editor.selectionStart = editor.selectionEnd = cursorPos; } catch (e) {}
+            
+            editor.addEventListener('input', () => {
+                // Check for reserved area editing
+                if (!preventReservedAreaEditing()) {
+                    return;
                 }
                 
-                const pushSettings = localState.push_settings || { display_lines: 1, transition_mode: 'fade' };
-                const displayLines = pushSettings.display_lines || 1;
-                const transitionMode = pushSettings.transition_mode || 'fade';
-                const isScroll = transitionMode === 'scroll' || transitionMode === 'scroll-normal';
-
-                let newHtmlContent;
-
-                if (isBlanked) {
-                    newHtmlContent = '';
-                } else if (isScroll) {
-                    const PREVIEW_CONTEXT_LINES = 4;
-                    const currentIndex = localState.current_index;
-                    const activeStartIndex = Math.max(0, currentIndex - (displayLines - 1));
-                    const previewStartIndex = Math.max(0, activeStartIndex - PREVIEW_CONTEXT_LINES);
-
-                    const linesForPreview = [];
-					for (let i = previewStartIndex; i <= currentIndex; i++) {
-						if (i < 0 || i >= localState.lines.length) continue;
-
-						const line = localState.lines[i];
-						
-						// ★ 核心修改：先處理好內容
-						const cleanedLine = cleanLineForDisplay(line);
-						
-						// ★ 如果處理後的內容是空的，就給它一個不斷行的空格
-						const content = cleanedLine || '&nbsp;';
-						
-						let lineHtml;
-
-						if (i >= activeStartIndex) {
-							// This is an active line
-							lineHtml = `<span style="opacity: 1; display: block;">${content}</span>`;
-						} else {
-							// This is a previous, context line
-							const opacity = (transitionMode === 'scroll') ? '0.4' : '1'; // Fade for 'scroll' mode
-							lineHtml = `<span style="opacity: ${opacity}; display: block;">${content}</span>`;
-						}
-						linesForPreview.push(lineHtml);
-					}
-					
-					
-                    newHtmlContent = linesForPreview.join('');
-                } else {
-                    const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
-                    const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
-                    newHtmlContent = linesToShow.map(line => cleanLineForDisplay(line)).join('<br>');
-                }
-
-                if (currentSubtitleDiv.innerHTML !== newHtmlContent) {
-                    if (transitionMode === 'fade' && !isScroll) {
-                        currentSubtitleDiv.classList.add('hidden');
-                        setTimeout(() => {
-                            currentSubtitleDiv.innerHTML = newHtmlContent;
-                            currentSubtitleDiv.classList.remove('hidden');
-                        }, 150);
-                    } else {
-                        currentSubtitleDiv.innerHTML = newHtmlContent;
+                clearTimeout(patchUpdateTimeout);
+                patchUpdateTimeout = setTimeout(() => {
+                    if (isComposing) return;
+                    const currentText = editor.value;
+                    if (currentText !== lastSentText) {
+                        const patch_text = dmp.patch_toText(dmp.patch_make(lastSentText, currentText));
+                        if (patch_text) {
+                            socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
+                        }
+                        lastSentText = currentText;
                     }
-                }
-
-                updateBookmarksList();
-                scheduleLineNumberUpdate();
-                updateStyles();
-
-                if (document.activeElement !== broadcastModeSelect) {
-                    broadcastModeSelect.value = pushSettings.broadcast_mode || 'manual';
-                }
-                if (document.activeElement !== displayLinesInput) {
-                    displayLinesInput.value = pushSettings.display_lines;
-                }
-                if (document.activeElement !== transitionModeSelect) {
-                    transitionModeSelect.value = pushSettings.transition_mode;
-                }
-
-                if (indexChanged) adjustScroll();
-                
-                // [NEW] 更新觀眾端連結
-                if (localState.viewer_id) {
-                    const viewerUrl = `${window.location.origin}/viewer/${localState.viewer_id}`;
-                    viewerLinkAnchor.href = viewerUrl;
-                    viewerLinkAnchor.textContent = viewerUrl;
-                }
-            }
-
-            function updateStyles() {
-                const styles = localState.style_settings || {};
-                const REFERENCE_WIDTH = 1920;
-
-                const bgColor = styles.bg_color || '#000000';
-                const fgColor = styles.fg_color || '#FFFF00';
-                const fontFamily = styles.font_family || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
-                const textAlign = styles.text_align || 'left';
-                const verticalAlign = styles.vertical_align || 'center';
-                const userMargin = styles.margin !== undefined ? styles.margin : 30;
-                const userFontSize = styles.font_size !== undefined ? styles.font_size : 100;
-                const fontVariant = styles.font_variant || 'normal';
-
-                currentSubtitleContainer.style.backgroundColor = bgColor;
-                currentSubtitleContainer.style.color = fgColor;
-                currentSubtitleContainer.style.fontFamily = fontFamily;
-                currentSubtitleContainer.style.textAlign = textAlign;
-                currentSubtitleContainer.style.fontWeight = (fontVariant === 'bold') ? 'bold' : 'normal';
-                currentSubtitleContainer.style.fontStyle = (fontVariant === 'italic') ? 'italic' : 'normal';
-                currentSubtitleContainer.style.boxSizing = 'border-box';
-
-                if (verticalAlign === 'top') {
-                    currentSubtitleContainer.style.justifyContent = 'flex-start';
-                } else if (verticalAlign === 'bottom') {
-                    currentSubtitleContainer.style.justifyContent = 'flex-end';
-                } else {
-                    currentSubtitleContainer.style.justifyContent = 'center';
-                }
-
-                const previewWidth = currentSubtitleContainer.clientWidth;
-                if (previewWidth > 0) {
-                    const actualMargin = (userMargin / REFERENCE_WIDTH) * previewWidth;
-                    const textAreaWidth = previewWidth - (actualMargin * 2);
-                    const referenceTextAreaWidth = REFERENCE_WIDTH - (userMargin * 2);
-                    const actualFontSize = (userFontSize / referenceTextAreaWidth) * textAreaWidth;
-
-                    currentSubtitleContainer.style.paddingLeft = `${actualMargin}px`;
-                    currentSubtitleContainer.style.paddingRight = `${actualMargin}px`;
-                    currentSubtitleContainer.style.fontSize = `${actualFontSize}px`;
-                }
-
-                if (document.activeElement !== fontSizeInput) fontSizeInput.value = userFontSize;
-                if (document.activeElement !== fgColorInput) fgColorInput.value = fgColor;
-                if (document.activeElement !== bgColorInput) bgColorInput.value = bgColor;
-                if (document.activeElement !== fontFamilySelect) fontFamilySelect.value = fontFamily;
-                if (document.activeElement !== textAlignSelect) textAlignSelect.value = textAlign;
-                if (document.activeElement !== verticalAlignSelect) verticalAlignSelect.value = styles.vertical_align || 'center';
-                if (document.activeElement !== marginInput) marginInput.value = userMargin;
-                if (document.activeElement !== fontVariantSelect) fontVariantSelect.value = styles.font_variant || 'normal';
-                
-                compensateForScrollbars();
-            }
-
-            function updateBookmarksList() {
-                bookmarksList.innerHTML = '';
-                for (const index in localState.bookmarks) {
-                    const li = document.createElement('li');
-                    const bookmarkText = localState.bookmarks[index];
-                    li.textContent = `${parseInt(index) + 1}: ${bookmarkText}`;
-                    li.title = bookmarkText;
-                    li.dataset.index = index;
-                    li.addEventListener('click', () => {
-                        isBlanked = false; 
-                        socket.emit('update_index', { room: ROOM_ID, index: parseInt(index), ...getPushOptions() });
-                    });
-                    bookmarksList.appendChild(li);
-                }
-            }
-
-            function scheduleLineNumberUpdate() {
-                clearTimeout(updateTimeout);
-                updateTimeout = setTimeout(updateLineNumbers, 150);
-            }
-
-            function updateLineNumbers() {
-                const lines = editor.value.split('\n');
-                const lineCount = lines.length;
-                const digits = String(lineCount).length;
-                const newWidth = 50 + (digits * 8) + 5;
-
-                if (parseInt(lineNumbersDiv.style.width) !== newWidth) {
-                    lineNumbersDiv.style.width = `${newWidth}px`;
-                    const newLeft = `${newWidth}px`;
-                    const newEditorWidth = `calc(100% - ${newWidth}px)`;
-                    editor.style.left = newLeft;
-                    editor.style.width = newEditorWidth;
-                }
-
-                const calculator = new LineHeightCalculator(editor, lineMeasure);
-                const lineMetrics = calculator.measureLines(lines);
-
-				// === ★ 修改：修正誤差校準機制 ===
-				let correctionFactor = 1.0; // 預設校準因子為 1 (即不校準)
-
-				// 只有當文本行數大於 30 行時，才啟用誤差校準機制
-				// 這樣可以避免在文本少時，scrollHeight 回傳錯誤值導致的佈局問題
-				if (lines.length > 25) {
-					const totalMeasuredHeight = lineMetrics.reduce((sum, m) => sum + m.height, 0);
-					
-					const editorStyles = window.getComputedStyle(editor);
-					const editorPaddingTop = parseFloat(editorStyles.paddingTop) || 0;
-					const editorPaddingBottom = parseFloat(editorStyles.paddingBottom) || 0;
-					const trueContentHeight = editor.scrollHeight - editorPaddingTop - editorPaddingBottom;
-
-					// 再次檢查，確保計算出的總高度與真實內容高度相近，避免極端情況
-					if (totalMeasuredHeight > 0 && trueContentHeight > 0 && Math.abs(trueContentHeight - totalMeasuredHeight) < editor.clientHeight) {
-						correctionFactor = trueContentHeight / totalMeasuredHeight;
-					}
-				}
-
-                const displayLines = localState.push_settings?.display_lines || 1;
-                const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
-                const endIndex = localState.current_index;
-
-                lineNumbersDiv.innerHTML = '';
-                
-                lines.forEach((line, logicalIndex) => {
-                    const metrics = lineMetrics[logicalIndex];
-                    const isHighlighted = logicalIndex >= startIndex && logicalIndex <= endIndex;
-                    
-                    const lineContainer = document.createElement('div');
-                    // [OPTIMIZATION] Apply the correction factor to each line's height
-                    const correctedHeight = metrics.height * correctionFactor;
-                    lineContainer.style.height = correctedHeight + 'px';
-                    
-                    const numberSpan = document.createElement('span');
-                    numberSpan.textContent = logicalIndex + 1;
-                    // Add some top padding to the number itself to better align with the text's first line.
-                    numberSpan.style.paddingTop = '0px'; 
-                    lineContainer.appendChild(numberSpan);
-
-                    if (isHighlighted) {
-                        const highlightClass = isBlanked ? 'highlight-blank' : 'highlight-active';
-                        lineContainer.classList.add(highlightClass);
-                    }
-                    
-                    if (localState.bookmarks[logicalIndex] !== undefined) {
-                        const dot = document.createElement('span');
-                        dot.className = 'bookmark-dot';
-                        lineContainer.appendChild(dot);
-                    }
-                    
-                    lineContainer.addEventListener('click', () => {
-                        isBlanked = false; 
-                        socket.emit('update_index', { room: ROOM_ID, index: logicalIndex, ...getPushOptions() });
-                    });
-                    lineContainer.addEventListener('dblclick', () => {
-                        toggleBookmark(logicalIndex);
-                    });
-
-                    lineNumbersDiv.appendChild(lineContainer);
-                });
-                
-                lineNumbersDiv.scrollTop = editor.scrollTop;
-                compensateForScrollbars();
-            }
-
-            sidebarToggleBtn.addEventListener('click', () => {
-                bookmarkSidebar.classList.toggle('collapsed');
-                setTimeout(() => {
-                    scheduleLineNumberUpdate();
-                    updateStyles();
-                }, 300);
+                }, 80);
             });
 
-            rightSidebarToggleBtn.addEventListener('click', () => {
-                controlPane.classList.toggle('collapsed');
-                rightSidebarToggleBtn.classList.toggle('collapsed');
-                setTimeout(() => {
-                    scheduleLineNumberUpdate();
-                    updateStyles();
-                }, 300);
+            // --- Button Event Listeners ---
+            editor.addEventListener('scroll', handleEditorScroll);
+            scrollToBottomBtn.addEventListener('click', () => {
+                scrollToBottom(editor);
             });
 
-            function toggleBookmark(index) {
-                const lines = editor.value.split('\n');
-                if (index >= lines.length) return;
-                const line = lines[index];
-                if (line.trim().startsWith('§')) {
-                    lines[index] = line.replace(/^§\s*/, '');
-                } else {
-                    lines[index] = '§ ' + line;
-                }
-                const newText = lines.join('\n');
-                editor.value = newText;
-                scheduleLineNumberUpdate();
-                socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
-            }
-
-			function adjustScroll() {
+			shareViewerBtn.addEventListener('click', async () => {
+                const viewerUrl = `${location.origin}/view/${localStorage.getItem('viewerId_' + ROOM_ID) || ''}`;
+                shareLinkAnchor.href = viewerUrl;
+                shareLinkAnchor.textContent = viewerUrl;
+                try { shareQrCodeContainer.innerHTML = ''; } catch(_) {}
                 try {
-                    const calculator = new LineHeightCalculator(editor, lineMeasure);
-                    const lines = editor.value.split('\n');
-                    
-                    if (lines.length === 0 || localState.current_index >= lines.length) {
-                        return;
-                    }
+                    new QRCode(shareQrCodeContainer, {
+                        text: viewerUrl,
+                        width: 180,
+                        height: 180,
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                } catch (e) {}
+                shareModal.style.display = 'flex';
+            });
 
-                    const lineMetrics = calculator.measureLines(lines);
-                    
-                    let targetY = 0;
-                    for (let i = 0; i < localState.current_index; i++) {
-                        targetY += lineMetrics[i].height;
-                    }
-                    
-                    const editorHeight = editor.clientHeight;
-                    const currentLineHeight = lineMetrics[localState.current_index].height;
-                    const comfortZonePx = 3 * calculator.baseLineHeight; // 上下各保留約 3 行的像素高度
-                    
-                    const comfortTopBoundary = editor.scrollTop + comfortZonePx;
-                    const comfortBottomBoundary = editor.scrollTop + editorHeight - comfortZonePx - currentLineHeight;
-                    
-                    // 只有當前行超出上下舒適區時，才觸發滾動
-                    if (targetY < comfortTopBoundary || targetY > comfortBottomBoundary) {
-                        
-                        let targetScrollTop;
+            settingsSaveBtn.addEventListener('click', exportSettingsToJson);
 
-                        // ★ 核心修改：判斷滾動方向
-                        if (targetY > comfortBottomBoundary) {
-                            // 情況 1：當前行在下方，需要向上滾動
-                            // 目標：讓當前行位於底部舒適區的頂部
-                            targetScrollTop = targetY - editorHeight + comfortZonePx + currentLineHeight;
-                        } else {
-                            // 情況 2：當前行在上方，需要向下滾動
-                            // 目標：讓當前行位於頂部舒適區的底部
-                            targetScrollTop = targetY - comfortZonePx;
-                        }
-
-                        // 計算最大允許的滾動位置
-                        const maxScrollTop = editor.scrollHeight - editor.clientHeight;
-
-                        // 將計算出的滾動位置限制在 [0, maxScrollTop] 的有效範圍內
-                        const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
-                        
-                        editor.scrollTop = finalScrollTop;
-                    }
+			shareCopyBtn.addEventListener('click', async () => {
+                const url = shareLinkAnchor.href || '';
+                if (!url || url.endsWith('#')) return;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    alert('已複製連結');
                 } catch (e) {
-                    console.error("Error adjusting scroll:", e);
+                    prompt('請手動複製觀眾連結：', url);
                 }
-            }
+            });
+            shareCloseBtn.addEventListener('click', () => { shareModal.style.display = 'none'; });
+            shareModal.addEventListener('click', (ev) => {
+                if (ev.target === shareModal) shareModal.style.display = 'none';
+            });
 
-            function showImportModal(content) {
-                importedFileContent = content;
-                importModal.style.display = 'flex';
-            }
+            // Add click-outside-to-close for other modals
+            replaceModal.addEventListener('click', (ev) => {
+                if (ev.target === replaceModal) replaceModal.style.display = 'none';
+            });
+            importModal.addEventListener('click', (ev) => {
+                if (ev.target === importModal) importModal.style.display = 'none';
+            });
 
-            function smartLoad(text) {
-                const lines = text.split('\n');
-                const newLines = [];
-                const MAX_LEN = 20;
-                const punctuation = /([,\.\uff0c\u3002\u3001?!;:\s])/; 
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine === '') continue;
-                    let currentLine = trimmedLine;
-                    while (currentLine.length > MAX_LEN) {
-                        let splitPos = -1;
-                        for (let i = MAX_LEN; i >= 0; i--) {
-                            if (i < currentLine.length && punctuation.test(currentLine[i])) {
-                                // If the split point is a space, check if it's adjacent to a digit.
-                                if (/\s/.test(currentLine[i])) {
-                                    // Check if preceded by a digit
-                                    if (i > 0 && /[0-9]/.test(currentLine[i - 1])) {
-                                        continue; // e.g., "2020 年" -> ignore space after "2020"
-                                    }
-                                    // Check if followed by a digit
-                                    if (i < currentLine.length - 1 && /[0-9]/.test(currentLine[i + 1])) {
-                                        continue; // e.g., "於 2020" -> ignore space before "2020"
-                                    }
-                                }
-                                splitPos = i;
-                                break;
-                            }
-                        }
-                        if (splitPos !== -1) {
-                            newLines.push(currentLine.substring(0, splitPos + 1).trim());
-                            currentLine = currentLine.substring(splitPos + 1).trim();
-                        } else {
-                            // No suitable punctuation found, so we keep the line as is and break the loop.
-                            break;
-                        }
-                    }
-                    if (currentLine.length > 0) newLines.push(currentLine);
-                }
-                return newLines.join('\n');
-            }
+            settingsLoadBtn.addEventListener('click', () => settingsFileInput.click());
+            settingsFileInput.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    importSettingsFromJson(String(ev.target?.result || ''));
+                };
+                reader.readAsText(file, 'UTF-8');
+                e.target.value = '';
+            });
 
-            clearBtn.addEventListener('click', () => {
+             clearBtn.addEventListener('click', () => {
                 if (window.confirm('您確定要清空所有文本嗎？此操作無法復原。')) {
-                    editor.value = '';
-                    socket.emit('update_script', { room: ROOM_ID, raw_text: '' });
+                    wrapUpdateFunction(() => {
+                        editor.value = '';
+                        editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    })();
                 }
             });
 
@@ -1415,33 +1289,40 @@
                 const file = event.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (e) => { showImportModal(e.target.result); };
+                reader.onload = (e) => { 
+                    importedFileContent = e.target.result;
+                    importModal.style.display = 'flex';
+                };
                 reader.readAsText(file, 'UTF-8');
                 event.target.value = '';
             });
-
+            
             exportBtn.addEventListener('click', () => {
                 const textToSave = editor.value;
                 const blob = new Blob([textToSave], { type: 'text/plain' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'text.txt';
-                document.body.appendChild(a);
+                a.download = 'script.txt';
+                document.body.appendChild(a); 
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(a.href);
             });
 
+            const wrappedUpdateEditorAndSend = wrapUpdateFunction((newText) => {
+                editor.value = newText;
+                socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
+                lastSentText = newText;
+            });
+
             importRawBtn.addEventListener('click', () => {
-                editor.value = importedFileContent;
-                socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                wrappedUpdateEditorAndSend(importedFileContent);
                 importModal.style.display = 'none';
             });
 
             importSmartBtn.addEventListener('click', () => {
                 const processedText = smartLoad(importedFileContent);
-                editor.value = processedText;
-                socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
+                wrappedUpdateEditorAndSend(processedText);
                 importModal.style.display = 'none';
             });
 
@@ -1463,688 +1344,316 @@
             replaceAllBtn.addEventListener('click', () => { 
                 const findText = findInput.value;
                 const replaceText = replaceInput.value;
-
                 if (!findText) {
                     alert('請輸入要尋找的詞彙。');
                     return;
                 }
-
-                const confirmation = window.confirm(`您確定要將所有的 "${findText}" 置換為 "${replaceText}" 嗎？\n\n此操作無法復原。`);
-
+                const confirmation = window.confirm(`您確定要將所有的 "${findText}" 置換為 "${replaceText}" 嗎？`);
                 if (confirmation) {
                     const originalText = editor.value;
                     const newText = originalText.split(findText).join(replaceText);
-
                     if (originalText !== newText) {
-                        editor.value = newText;
-                        
-                        if (dmp) {
-                            const patch_text = dmp.patch_toText(dmp.patch_make(originalText, newText));
-                            if (patch_text) {
-                                socket.emit('patch_script', {
-                                    room: ROOM_ID,
-                                    patch: patch_text
-                                });
-                            }
-                        } else {
-                            socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
-                        }
-                        
-                        lastSentText = newText; 
-                        scheduleLineNumberUpdate();
+                        wrappedUpdateEditorAndSend(newText);
                     }
-                    
                     replaceModal.style.display = 'none';
                 }
             });
 
-            saveConfigBtn.addEventListener('click', () => {
-                const config = localState.style_settings;
-                const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'teleprompter-style.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(a.href);
-            });
-
-            loadConfigBtn.addEventListener('click', () => { configInput.click(); });
-
-            configInput.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const newStyles = JSON.parse(e.target.result);
-                        if (newStyles.font_size && newStyles.fg_color && newStyles.bg_color) {
-                            socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
-                        } else { alert('無效的組態檔案格式。'); }
-                    } catch (err) { alert('讀取檔案失敗，請確認是否為正確的 JSON 檔案。'); console.error(err); }
-                };
-                reader.readAsText(file);
-                event.target.value = '';
-            });
-
-            function handleStyleChange() {
-                const newStyles = { 
-                    font_size: parseInt(fontSizeInput.value),
-                    fg_color: fgColorInput.value, 
-                    bg_color: bgColorInput.value,
-                    font_family: fontFamilySelect.value,
-                    text_align: textAlignSelect.value,
-                    vertical_align: verticalAlignSelect.value,
-                    margin: parseInt(marginInput.value) || 15,
-                    font_variant: fontVariantSelect.value
-                };
-                socket.emit('update_styles', { room: ROOM_ID, styles: newStyles });
-                Object.assign(localState.style_settings, newStyles);
-                updateUI();
-                
-                // [NEW] 樣式變更後立即推播當前內容到觀眾端
-                if (!isBlanked) {
-                    const displayLines = localState.push_settings?.display_lines || 1;
-                    const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
-                    const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
-                    const content = linesToShow.map(line => cleanLineForDisplay(line)).join('\n');
-                    socket.emit('send_content', { room: ROOM_ID, text: content });
-                }
-            }
-            [fontSizeInput, fgColorInput, bgColorInput, marginInput].forEach(el => el.addEventListener('input', handleStyleChange));
-            [fontFamilySelect, textAlignSelect, verticalAlignSelect, fontVariantSelect].forEach(el => el.addEventListener('change', handleStyleChange));
-
-
-            function handlePushSettingsChange() {
-                const settings = {
-                    display_lines: parseInt(displayLinesInput.value) || 1,
-                    transition_mode: transitionModeSelect.value,
-                    broadcast_mode: broadcastModeSelect.value
-                };
-                socket.emit('update_push_settings', { room: ROOM_ID, settings: settings });
-            }
-            displayLinesInput.addEventListener('input', handlePushSettingsChange);
-            transitionModeSelect.addEventListener('change', handlePushSettingsChange);
-            broadcastModeSelect.addEventListener('change', handlePushSettingsChange);
-
-            function broadcastEditorChanges() {
-                socket.emit('editor_change', {
-                    room: ROOM_ID,
-                    raw_text: editor.value,
-                    cursor_pos: editor.selectionStart
-                });
-                autoFollowCurrentLine();
-            }
-
-            function scheduleCollaborationUpdate() {
-                clearTimeout(collaborationUpdateTimeout);
-                collaborationUpdateTimeout = setTimeout(broadcastEditorChanges, 250);
-            }
-
-            // [MODIFIED] 替換原有的 'input' 事件監聽器
-            editor.addEventListener('input', () => {
-                clearTimeout(patchUpdateTimeout);
-                patchUpdateTimeout = setTimeout(() => {
-                    const currentText = editor.value;
-                    // 僅在文本有變化時才生成和發送補丁
-                    if (currentText !== lastSentText) {
-                        if (dmp) {
-                            // 使用 diff-patch 機制
-                            const patch_text = dmp.patch_toText(dmp.patch_make(lastSentText, currentText));
-                            
-                            if (patch_text) {
-                                socket.emit('patch_script', {
-                                    room: ROOM_ID,
-                                    patch: patch_text
-                                });
-                            }
-                        } else {
-                            // 備用方案：使用原始的完整文本更新
-                            socket.emit('update_script', { 
-                                room: ROOM_ID, 
-                                raw_text: currentText 
-                            });
-                        }
-                        
-                        lastSentText = currentText; // 更新基準文本
-                    }
-                }, 200); // 200毫秒的延遲，避免過於頻繁發送
-
-                // 本地UI仍然需要即時更新
-                scheduleLineNumberUpdate();
-                autoFollowCurrentLine();
-            });
-
-            editor.addEventListener('scroll', () => { lineNumbersDiv.scrollTop = editor.scrollTop; });
-
-            const pushCurrentLine = () => {
-                isBlanked = false; 
-                const textUpToCursor = editor.value.substring(0, editor.selectionStart);
-                const lineNumber = textUpToCursor.split('\n').length - 1;
-                if (lineNumber !== localState.current_index || isBlanked) {
-                    socket.emit('update_index', { room: ROOM_ID, index: lineNumber, ...getPushOptions() });
-                }
-            };
-
-            function focusEditorAtCurrentLine() {
-                editor.focus();
-                const lines = editor.value.split('\n');
-                let cursorPos = 0;
-                for (let i = 0; i < localState.current_index; i++) {
-                    cursorPos += (lines[i] || '').length + 1;
-                }
-                cursorPos += (lines[localState.current_index] || '').length;
-                editor.selectionStart = editor.selectionEnd = cursorPos;
-            }
-
-            editor.addEventListener('contextmenu', (e) => { 
-                e.preventDefault(); 
-                pushCurrentLine(); 
-            });
-
-            editor.addEventListener('keydown', (e) => {
-                if (e.key === 'Insert') {
-                    e.preventDefault();
-                    pushCurrentLine();
-                }
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    editor.blur();
-                }
-            });
-
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && (e.key === '=' || e.key === '+' || e.key === '-')) {
-                    e.preventDefault();
-                    const currentStyles = { ...localState.style_settings };
-                    let currentSize = parseInt(currentStyles.font_size);
-                    const step = 2;
-                    if (e.key === '=' || e.key === '+') currentSize += step;
-                    else currentSize -= step;
-                    currentStyles.font_size = Math.max(10, Math.min(200, currentSize));
-                    socket.emit('update_styles', { room: ROOM_ID, styles: currentStyles });
-                }
-
-                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-
-                if (e.code === 'Space' && !e.repeat) {
-                    e.preventDefault();
-                    isBlanked = !isBlanked;
-                    
-                    if (isBlanked) {
-                        socket.emit('send_content', { room: ROOM_ID, text: '' });
-                    } else {
-                        const displayLines = localState.push_settings?.display_lines || 1;
-                        const startIndex = Math.max(0, localState.current_index - (displayLines - 1));
-                        const linesToShow = localState.lines.slice(startIndex, localState.current_index + 1);
-                        const content = linesToShow.map(line => cleanLineForDisplay(line)).join('\n');
-                        socket.emit('send_content', { room: ROOM_ID, text: content });
-                    }
-                    updateUI();
-                    return; 
-                }
-
-                if (e.key === 'Enter' || e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    focusEditorAtCurrentLine();
-                }
-
-                if (['PageDown', 'ArrowDown', 'PageUp', 'ArrowUp'].includes(e.key)) {
-                    e.preventDefault();
-                    isBlanked = false; 
-                    let newIndex = localState.current_index;
-                    if (e.key === 'PageDown' || e.key === 'ArrowDown') {
-                        newIndex = Math.min((localState.lines.length || 1) - 1, localState.current_index + 1);
-                    } else {
-                        newIndex = Math.max(0, localState.current_index - 1);
-                    }
-                    if (newIndex !== localState.current_index) {
-                        socket.emit('update_index', { room: ROOM_ID, index: newIndex, ...getPushOptions() });
-                    }
-                }
-            });
-
-            document.addEventListener('contextmenu', (e) => {
-                if (e.target.closest('button, a, select, input, textarea, #line-numbers, #bookmarks-list')) { return; }
-                e.preventDefault();
-                pushCurrentLine();
-            });
-
-            document.addEventListener('click', (e) => {
-                if (e.target.closest('button, a, select, input, textarea, #line-numbers, #bookmarks-list')) {
-                    return;
-                }
-                focusEditorAtCurrentLine();
-            });
-
-            function cleanLineForDisplay(line) { return line.replace(/^§\s*/, '').replace(/^#\s*/, ''); }
-
-            new ResizeObserver(updateStyles).observe(currentSubtitleContainer);
-            
-            const editorResizeObserver = new ResizeObserver(() => {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(() => {
-                    scheduleLineNumberUpdate();
-                }, 50);
-            });
-            editorResizeObserver.observe(editor);
-
-
             leaveRoomBtn.addEventListener('click', () => {
-                if (window.confirm("您確定要離開這個房間的導播頁面嗎？\n\n（這將會中斷與伺服器的連線，並顯示一個結束畫面。）")) {
+                if (window.confirm("您確定要離開這個房間嗎？")) {
                     if (socket && socket.connected) socket.disconnect();
                     document.documentElement.innerHTML = `
-                        <head>
-                            <meta charset="UTF-8"><title>已離開</title>
-                            <style>
-                                body { background-color: #2c3e50; color: #ecf0f1; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; }
-                                h1 { font-size: 4rem; font-weight: 300; border: 2px solid #ecf0f1; padding: 20px 40px; border-radius: 10px; }
-                            </style>
-                        </head>
-                        <body><h1>Goodbye</h1></body>
+                        <head><meta charset="UTF-8"><title>已離開</title><style>body{background-color:#2c3e50;color:#ecf0f1;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;}h1{font-size:4rem;font-weight:300;}</style></head>
+                        <body><h1>已離開房間</h1></body>
                     `;
                 }
             });
-			
-        // [新增] 控制分享 Modal 的事件
-        shareBtn.addEventListener('click', () => {
-            const url = viewerLinkAnchor.href;
-            if (!url || url.includes('#') || url.includes('...')) {
-                alert('連結尚未產生，請稍候...');
-                return;
-            }
-            
-            qrcodeContainer.innerHTML = ''; // 清空舊的 QR Code
-            try {
-                const qr = qrcode(0, 'L');
-                qr.addData(url);
-                qr.make();
-                const dataUrl = qr.createDataURL(6, 10);
-                const imgElement = document.createElement('img');
-                imgElement.src = dataUrl;
-                imgElement.alt = 'Viewer Link QR Code';
-                imgElement.style.width = '256px';
-                imgElement.style.height = '256px';
-                qrcodeContainer.appendChild(imgElement);
-                shareModal.style.display = 'flex'; // 顯示 Modal
-            } catch (e) {
-                console.error('QR Code generation failed:', e);
-                alert('產生 QR Code 失敗！');
-            }
-        });
 
-        // 關閉按鈕
-        shareModalCloseBtn.addEventListener('click', () => {
-            shareModal.style.display = 'none';
-        });
-
-        // 點擊 Modal 外部區域關閉
-        shareModal.addEventListener('click', (e) => {
-            if (e.target === shareModal) {
-                shareModal.style.display = 'none';
-            }
-        });			
-
-            gotoFirstLineBtn.addEventListener('click', () => {
-                isBlanked = false;
-                socket.emit('update_index', { room: ROOM_ID, index: 0, ...getPushOptions() });
-            });
-
-            gotoLastLineBtn.addEventListener('click', () => {
-                if (localState.lines && localState.lines.length > 0) {
-                    isBlanked = false;
-                    const lastIndex = localState.lines.length - 1;
-                    socket.emit('update_index', { room: ROOM_ID, index: lastIndex, ...getPushOptions() });
-                }
-            });
-
-            document.addEventListener('selectionchange', () => {
-                if (document.activeElement === editor) {
-                    handleCursorOrSelectionChange();
-                }
-            });
-
-            function handleCursorOrSelectionChange() {
-                clearTimeout(cursorSyncTimeout);
-                cursorSyncTimeout = setTimeout(() => {
-                    const broadcastMode = localState.push_settings?.broadcast_mode || 'manual';
-                    if (broadcastMode !== 'follow_cursor') {
-                        return;
+            function smartLoad(text) {
+                const lines = text.split('\n');
+                const newLines = [];
+                const MAX_LEN = 20;
+                const punctuation = /([，、；。！？…])/; 
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine === '') continue;
+                    let currentLine = trimmedLine;
+                    while (currentLine.length > MAX_LEN) {
+                        let splitPos = -1;
+                        for (let i = MAX_LEN; i >= 0; i--) {
+                            if (i < currentLine.length && punctuation.test(currentLine[i])) {
+                                splitPos = i;
+                                break;
+                            }
+                        }
+                        if (splitPos !== -1) {
+                            newLines.push(currentLine.substring(0, splitPos + 1).trim());
+                            currentLine = currentLine.substring(splitPos + 1).trim();
+                        } else {
+                            break;
+                        }
                     }
-                    socket.emit('cursor_sync', {
-                        room: ROOM_ID,
-                        cursor_pos: editor.selectionStart
-                    });
-                    pushCurrentLine();
-                }, 100);
+                    if (currentLine.length > 0) newLines.push(currentLine);
+                }
+                return newLines.join('\n');
+            }
+
+            // === Speech Recognition (REWRITTEN WITH DYNAMIC EMPTY LINE MANAGEMENT) ===
+            function showSpeechStatus(message, type = 'info') {
+                try { console.debug('[Speech]', type, message || ''); } catch(e) {}
             }
             
-            function initializeSpeechRecognition() {
-                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                    showSpeechStatus('您的瀏覽器不支援語音識別功能。請使用最新版的 Chrome 瀏覽器。', 'error');
-                    return false;
+            // Speech Recognition State
+            let recognition = null;
+            let isRecording = false;
+            let userRequestedStop = false;
+            
+            // NEW: Dynamic Empty Line Management for Speech Transcription
+            let speechReservedLines = 0; // Number of reserved empty lines
+            let speechStartPosition = null; // Position where speech transcription started
+            let lastInterimLineCount = 0; // Track interim text line count for dynamic adjustment
+            
+            // Speech anchor management
+            let speechAnchor = null;
+            let provisionalBuffer = '';
+            let anchorInitialSelLen = 0;
+            
+            // NEW: Text metrics and line calculation utilities for speech overlay
+            function calculateInterimLineCount(text, textareaWidth) {
+                if (!text) return 0;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const style = window.getComputedStyle(editor);
+                ctx.font = `${style.fontSize} ${style.fontFamily}`;
+                
+                const lines = text.split('\n');
+                let totalLines = 0;
+                
+                for (const line of lines) {
+                    if (line === '') {
+                        totalLines += 1;
+                        continue;
+                    }
+                    const textWidth = ctx.measureText(line).width;
+                    const availableWidth = textareaWidth - 72; // Account for padding
+                    const wrappedLines = Math.max(1, Math.ceil(textWidth / availableWidth));
+                    totalLines += wrappedLines;
                 }
+                
+                return totalLines;
+            }
+            
+            function getTextAreaContentWidth() {
+                const style = window.getComputedStyle(editor);
+                const paddingLeft = parseFloat(style.paddingLeft) || 0;
+                const paddingRight = parseFloat(style.paddingRight) || 0;
+                return editor.clientWidth - paddingLeft - paddingRight;
+            }
+            
+            function findLastContentPosition() {
+                const text = editor.value;
+                // Find the last non-empty line position
+                const lines = text.split('\n');
+                let lastContentIndex = -1;
+                
+                for (let i = lines.length - 1; i >= 0; i--) {
+                    if (lines[i].trim() !== '') {
+                        // Calculate position at end of this line
+                        lastContentIndex = lines.slice(0, i + 1).join('\n').length;
+                        break;
+                    }
+                }
+                
+                return lastContentIndex === -1 ? 0 : lastContentIndex;
+            }
+            
+            function addReservedEmptyLines(lineCount) {
+                const currentText = editor.value;
+                const lastContentPos = findLastContentPosition();
+                
+                // Remove existing reserved lines first
+                let textWithoutReserved = currentText;
+                if (speechReservedLines > 0) {
+                    const linesToRemove = '\n'.repeat(speechReservedLines);
+                    textWithoutReserved = currentText.replace(new RegExp(linesToRemove + '$'), '');
+                }
+                
+                // Add new reserved lines
+                const newReservedLines = '\n'.repeat(lineCount);
+                const newText = textWithoutReserved + newReservedLines;
+                
+                editor.value = newText;
+                speechReservedLines = lineCount;
+                
+                // Sync to collaborators
+                try {
+                    const patch_text = dmp.patch_toText(dmp.patch_make(currentText, newText));
+                    if (patch_text) {
+                        socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
+                        lastSentText = newText;
+                    }
+                } catch(e) {}
+            }
+            
+            function removeReservedEmptyLines() {
+                if (speechReservedLines === 0) return;
+                
+                const currentText = editor.value;
+                const linesToRemove = '\n'.repeat(speechReservedLines);
+                const newText = currentText.replace(new RegExp(linesToRemove + '$'), '');
+                
+                editor.value = newText;
+                speechReservedLines = 0;
+                
+                // Sync reserved line removal to collaborators
+                try {
+                    const patch_text = dmp.patch_toText(dmp.patch_make(currentText, newText));
+                    if (patch_text) {
+                        socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
+                        lastSentText = newText;
+                    }
+                } catch(e) {}
+            }
+            
+            // Initialize speech recognition with dynamic empty line management
+            function initializeSpeechRecognition() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    showSpeechStatus('您的瀏覽器不支援語音識別功能。', 'error');
+                    speechToggleBtn.disabled = true;
+                    return;
+                }
+
                 recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                recognition.lang = speechLangSelect.value;
-                recognition.maxAlternatives = 1;
                 
-                recognition.onstart = function() {
-                    isRecording = true;
-                    speechToggleBtn.disabled = false;
-                    speechToggleBtn.classList.add('recording');
-                    speechToggleBtn.textContent = '停止語音識別';
-                    showSpeechStatus('語音識別已啟動，請開始說話...', 'success');
-                };
-                
-                recognition.onresult = function(event) {
-                    let newFinalTranscript = '';
-                    let newInterimTranscript = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const transcript = event.results[i][0].transcript;
+                recognition.onresult = (event) => {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+                    
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
                         if (event.results[i].isFinal) {
-                            newFinalTranscript += transcript;
+                            finalTranscript += event.results[i][0].transcript;
                         } else {
-                            newInterimTranscript += transcript;
+                            interimTranscript += event.results[i][0].transcript;
                         }
                     }
-                    
-                    if (newFinalTranscript) {
-                        finalTranscript += newFinalTranscript;
-                        lastSpeechTime = Date.now();
-                        clearPendingInterimText();
-                        processAndInsertFinalTranscript(newFinalTranscript);
-                        setupSilenceDetection();
-                    }
-                    
-                    interimTranscript = newInterimTranscript;
+
                     if (interimTranscript) {
-                        handleInterimResult(interimTranscript);
-                        showSpeechStatus(`識別中: ${interimTranscript}`, 'success');
+                        const textareaWidth = getTextAreaContentWidth();
+                        const neededLines = calculateInterimLineCount(interimTranscript, textareaWidth);
+                        const requiredEmptyLines = neededLines + 1;
+                        
+                        if (requiredEmptyLines !== speechReservedLines) {
+                            addReservedEmptyLines(requiredEmptyLines);
+                        }
+                        
+                        lastInterimLineCount = neededLines;
+                        
+                        const lastContentPos = findLastContentPosition();
+                        const overlayPosition = lastContentPos > 0 ? lastContentPos + 1 : lastContentPos;
+                        showInterimAtCursor(interimTranscript, overlayPosition);
+                    }
+                    
+                    if (finalTranscript) {
+                        removeReservedEmptyLines();
+                        const breakMode = directorSpeechBreakMode.value;
+                        let separator = '';
+                        if (breakMode === 'newline') {
+                            separator = '\n';
+                        } else if (breakMode === 'double-newline') {
+                            separator = '\n\n';
+                        }
+                        const textToInsert = finalTranscript + separator;
+                        insertAtCursor(editor, textToInsert);
+                        
+                        showInterimAtCursor('', 0);
+                        lastInterimLineCount = 0;
                     }
                 };
                 
-                recognition.onerror = function(event) {
-                    console.error('語音識別錯誤:', event.error, event);
-                    let shouldRestart = false;
-                    let restartDelay = 1000;
-                    let statusMsg = `語音識別錯誤: ${event.error}`;
-                    let statusType = 'error';
-
-                    switch (event.error) {
-                        case 'no-speech':
-                            statusMsg = '等待語音輸入...';
-                            statusType = 'success';
-                            shouldRestart = true;
-                            restartDelay = 500;
-                            break;
-                        case 'audio-capture':
-                            statusMsg = '麥克風錯誤，請檢查麥克風設定';
-                            shouldRestart = true;
-                            break;
-                        case 'not-allowed':
-                            statusMsg = '語音識別被拒絕，請允許麥克風權限後重新啟動';
-                            stopSpeechRecognition();
-                            break;
-                        case 'network':
-                            statusMsg = '網路連線問題，正在重試...';
-                            statusType = 'success';
-                            shouldRestart = true;
-                            restartDelay = 2000;
-                            break;
-                        default:
-                            statusMsg = `正在重新連線... (${event.error})`;
-                            statusType = 'success';
-                            shouldRestart = true;
-                            break;
-                    }
-
-                    showSpeechStatus(statusMsg, statusType);
-
-                    if (shouldRestart && isRecording) {
-                        setTimeout(() => {
-                            if (isRecording && recognition) {
-                                try { recognition.start(); } catch (e) { stopSpeechRecognition(); }
-                            }
-                        }, restartDelay);
-                    }
+                recognition.onstart = () => {
+                    isRecording = true;
+                    speechToggleBtn.textContent = '停止語音識別';
+                    speechToggleBtn.classList.add('recording');
+                    
+                    speechReservedLines = 0;
+                    lastInterimLineCount = 0;
+                    speechStartPosition = null;
                 };
                 
-                recognition.onend = function() {
-                    if (isRecording) {
+                recognition.onend = () => {
+                    if (userRequestedStop) {
+                        // NOTE: 使用者主動停止，正常正山狄0
+                        isRecording = false;
+                        speechToggleBtn.textContent = '開始語音識別';
+                        speechToggleBtn.classList.remove('recording');
+                        removeReservedEmptyLines();
+                    } else if (isRecording) {
+                        // NOTE: 非使用者主動停止（網路抒動、手機鎖屏等），自動失常等待後嘗試重啟
                         setTimeout(() => {
-                            if (isRecording && recognition) {
+                            if (!userRequestedStop && isRecording) {
                                 try {
+                                    recognition.lang = speechLangSelect.value;
                                     recognition.start();
-                                } catch (e) {
-                                    if (e.name === 'InvalidStateError') {
-                                        if (initializeSpeechRecognition()) {
-                                            try { recognition.start(); } catch (e2) { stopSpeechRecognition(); }
-                                        }
-                                    } else {
-                                        stopSpeechRecognition();
-                                    }
+                                } catch(e) {
+                                    console.error('Speech recognition restart error:', e);
                                 }
                             }
                         }, 300);
-                    } else {
-                        stopSpeechRecognition();
                     }
                 };
-                return true;
+                
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    // NOTE: 不可復覆的錯誤類型，停止語音識別避免無限重啟
+                    const nonRecoverableErrors = ['not-allowed', 'service-not-allowed', 'audio-capture'];
+                    if (nonRecoverableErrors.includes(event.error)) {
+                        userRequestedStop = true;
+                        isRecording = false;
+                        speechToggleBtn.textContent = '開始語音識別';
+                        speechToggleBtn.classList.remove('recording');
+                    }
+                };
             }
             
             function startSpeechRecognition() {
-                if (isRecording) { stopSpeechRecognition(); }
-                editor.focus();
-                const textLength = editor.value.length;
-                editor.selectionStart = editor.selectionEnd = textLength;
-                if (!recognition) {
-                    if (!initializeSpeechRecognition()) return;
-                }
-                recognition.lang = speechLangSelect.value;
-                try {
-                    recognition.start();
-                    finalTranscript = '';
-                    interimTranscript = '';
-                } catch (e) {
-                    showSpeechStatus(`啟動語音識別失敗: ${e.message}`, 'error');
-                    if (initializeSpeechRecognition()) {
-                        try { recognition.start(); } catch (e2) { showSpeechStatus(`語音識別啟動失敗: ${e2.message}`, 'error'); }
+                if (!recognition) return;
+                userRequestedStop = false;
+                
+                // NOTE: 首次啟動語音識別時，自動清空預設提示文字（只觸發一次）
+                const CLEARED_KEY = 'speechWelcomeCleared_' + ROOM_ID;
+                if (!localStorage.getItem(CLEARED_KEY)) {
+                    localStorage.setItem(CLEARED_KEY, '1');
+                    if (editor.value.trim() !== '') {
+                        wrapUpdateFunction(() => {
+                            editor.value = '';
+                            socket.emit('update_script', { room: ROOM_ID, raw_text: '' });
+                            lastSentText = '';
+                        })();
                     }
+                }
+
+                try {
+                    recognition.lang = speechLangSelect.value;
+                    recognition.start();
+                } catch (e) {
+                    console.error('Speech recognition start error:', e);
                 }
             }
             
             function stopSpeechRecognition() {
-                isRecording = false;
-                if (recognition) {
-                    try { recognition.stop(); } catch (e) {}
-                }
-                speechToggleBtn.disabled = false;
-                speechToggleBtn.classList.remove('recording');
-                speechToggleBtn.textContent = '開始語音識別';
-                if (silenceTimer) clearTimeout(silenceTimer);
-                if (editorUpdateTimer) clearTimeout(editorUpdateTimer);
-                if (pushUpdateTimer) clearTimeout(pushUpdateTimer);
-                commaCount = 0;
-                if (interimTranscript) {
-                    processAndInsertFinalTranscript(interimTranscript);
-                    interimTranscript = '';
-                }
-                clearPendingInterimText();
-                showSpeechStatus('語音識別已停止', 'success');
-				// [新增] 3秒後自動隱藏狀態列
-				setTimeout(() => {
-					if (!isRecording) { // 再次確認使用者沒有馬上又按下開始
-						speechStatus.style.display = 'none';
-					}
-				}, 3000);
-            }
-            
-            function handleInterimResult(text) {
-                if (!text.trim()) return;
-                clearPendingInterimText();
-                const cursorPos = editor.selectionStart;
-                const textBefore = editor.value.substring(0, cursorPos);
-                const textAfter = editor.value.substring(cursorPos);
-                let separator = '';
-                let willCreateNewLine = false;
-                if (textBefore && !textBefore.endsWith('\n') && !textBefore.endsWith(' ')) {
-                    separator = ' ';
-                }
-                const currentLineStart = textBefore.lastIndexOf('\n') + 1;
-                const currentLineText = textBefore.substring(currentLineStart);
-                if (currentLineText.length + text.length > maxLineLength) {
-                    separator = '\n';
-                    willCreateNewLine = true;
-                }
-                currentInterimText = separator + text;
-                editor.value = textBefore + currentInterimText + textAfter;
-                const newCursorPos = cursorPos + currentInterimText.length;
-                editor.selectionStart = editor.selectionEnd = newCursorPos;
-                scheduleCollaborationUpdate();
-                setTimeout(scheduleLineNumberUpdate, interimUpdateDelay);
-                if (isRecording) {
-                    setTimeout(autoFollowCurrentLine, willCreateNewLine ? interimPushDelay : interimPushDelay);
+                if (!recognition || !isRecording) return;
+                userRequestedStop = true;
+                
+                try {
+                    recognition.stop();
+                } catch(e) {
+                    console.error('Error stopping recognition:', e);
                 }
             }
             
-            function clearPendingInterimText() {
-                if (currentInterimText) {
-                    const cursorPos = editor.selectionStart;
-                    const textBefore = editor.value.substring(0, cursorPos - currentInterimText.length);
-                    const textAfter = editor.value.substring(cursorPos);
-                    editor.value = textBefore + textAfter;
-                    editor.selectionStart = editor.selectionEnd = cursorPos - currentInterimText.length;
-                    currentInterimText = '';
-                    scheduleCollaborationUpdate();
-                }
-            }
-            
-            function processAndInsertFinalTranscript(text) {
-                if (!text.trim()) return;
-                const cursorPos = editor.selectionStart;
-                const textBefore = editor.value.substring(0, cursorPos);
-                const textAfter = editor.value.substring(cursorPos);
-                let separator = '';
-                let willCreateNewLine = false;
-                if (textBefore && !textBefore.endsWith('\n') && !textBefore.endsWith(' ')) {
-                    separator = ' ';
-                }
-                const currentLineStart = textBefore.lastIndexOf('\n') + 1;
-                const currentLineText = textBefore.substring(currentLineStart);
-                if (currentLineText.length + text.length > maxLineLength) {
-                    separator = '\n';
-                    willCreateNewLine = true;
-                }
-                const sentences = splitIntoSentences(text);
-                const newText = sentences.join('\n');
-                editor.value = textBefore + separator + newText + textAfter;
-                const newCursorPos = cursorPos + separator.length + newText.length;
-                editor.selectionStart = editor.selectionEnd = newCursorPos;
-                scheduleCollaborationUpdate();
-                setTimeout(scheduleLineNumberUpdate, finalUpdateDelay);
-                if (isRecording) {
-                    setTimeout(autoFollowCurrentLine, willCreateNewLine ? finalPushDelay : finalPushDelay);
-                }
-                setTimeout(() => {
-                    if (editor.value !== localState.raw_text) {
-                        socket.emit('update_script', { room: ROOM_ID, raw_text: editor.value });
-                    }
-                }, finalUpdateDelay);
-            }
-            
-            function autoFollowCurrentLine() {
-                const broadcastMode = localState.push_settings?.broadcast_mode || 'manual';
-                if (broadcastMode !== 'automatic') return;
-                const lineCount = editor.value.split('\n').length;
-                const lastLineIndex = Math.max(0, lineCount - 1);
-                if (lastLineIndex !== localState.current_index) {
-                    socket.emit('update_index', {
-                        room: ROOM_ID, 
-                        index: lastLineIndex, 
-                        raw_text: editor.value,
-                        ...getPushOptions() 
-                    });
-                }
-            }
-            
-            function setupSilenceDetection() {
-                if (silenceTimer) clearTimeout(silenceTimer);
-                silenceTimer = setTimeout(() => {
-                    if (!isRecording) return;
-                    const silenceDuration = Date.now() - lastSpeechTime;
-                    if (silenceDuration >= longPauseThreshold) {
-                        addSmartPunctuation('。', true);
-                    } else if (silenceDuration >= mediumPauseThreshold) {
-                        addSmartPunctuation('。');
-                    } else if (silenceDuration >= shortPauseThreshold) {
-                        addSmartPunctuation('，');
-                    } else {
-                        setupSilenceDetection();
-                    }
-                }, silenceCheckInterval);
-            }
-            
-            function addSmartPunctuation(punctuation, forceNewline = false) {
-                const cursorPos = editor.selectionStart;
-                const textBefore = editor.value.substring(0, cursorPos);
-                const textAfter = editor.value.substring(cursorPos);
-                if (textBefore && !punctuationMarks.test(textBefore.slice(-1))) {
-                    let insertText = punctuation;
-                    let shouldAddNewline = forceNewline;
-                    const currentLineStart = textBefore.lastIndexOf('\n') + 1;
-                    const currentLineText = textBefore.substring(currentLineStart);
-                    const currentLineLength = currentLineText.length;
-                    const currentLineCommas = (currentLineText.match(/，/g) || []).length;
-                    if (!shouldAddNewline) {
-                        if (currentLineLength >= maxLineLength || (punctuation === '，' && currentLineCommas >= 1) || punctuation === '。') {
-                            shouldAddNewline = true;
-                        }
-                    }
-                    if (shouldAddNewline) {
-                        insertText += '\n';
-                        commaCount = 0;
-                    } else if (punctuation === '，') {
-                        commaCount++;
-                    }
-                    editor.value = textBefore + insertText + textAfter;
-                    const newCursorPos = cursorPos + insertText.length;
-                    editor.selectionStart = editor.selectionEnd = newCursorPos;
-                    scheduleCollaborationUpdate();
-                    if (shouldAddNewline && isRecording) {
-                        setTimeout(autoFollowCurrentLine, finalPushDelay);
-                    }
-                }
-            }
-
-            function showSpeechStatus(message, type = 'success') {
-                speechStatus.textContent = message;
-                speechStatus.className = `speech-status ${type}`;
-                speechStatus.style.display = 'block';
-            }
-
-            function splitIntoSentences(text) {
-                if (text.length < 20) return [text];
-                let sentences = [];
-                let currentSentence = '';
-                for (let i = 0; i < text.length; i++) {
-                    const char = text[i];
-                    currentSentence += char;
-                    if (sentenceEndings.test(char) && currentSentence.length > 5) {
-                        sentences.push(currentSentence.trim());
-                        currentSentence = '';
-                    }
-                }
-                if (currentSentence.trim()) {
-                    sentences.push(currentSentence.trim());
-                }
-                return sentences.length > 0 ? sentences : [text];
-            }
-
             speechToggleBtn.addEventListener('click', () => {
                 if (isRecording) {
                     stopSpeechRecognition();
@@ -2152,44 +1661,224 @@
                     startSpeechRecognition();
                 }
             });
-            speechLangSelect.addEventListener('change', () => {
-                if (isRecording) {
-                    stopSpeechRecognition();
-                    setTimeout(startSpeechRecognition, 200);
+            
+            // Utility functions
+            function insertAtCursor(textarea, text) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const before = textarea.value.substring(0, start);
+                const after = textarea.value.substring(end);
+                textarea.value = before + text + after;
+                textarea.selectionStart = textarea.selectionEnd = start + text.length;
+            }
+            
+            // Create interim overlay for showing speech preview
+            const remoteCursorsOverlay = document.getElementById('remote-cursors-overlay');
+            const interimOverlay = document.createElement('div');
+            interimOverlay.className = 'interim-overlay';
+            remoteCursorsOverlay.appendChild(interimOverlay);
+            
+            // Text measurement utility for precise positioning
+            const textMetrics = (function(textarea) {
+                const measurementDiv = document.createElement('div');
+                document.body.appendChild(measurementDiv);
+                
+                function syncStyles() {
+                    const style = window.getComputedStyle(textarea);
+                    const props = [
+                        'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight',
+                        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+                        'boxSizing'
+                    ];
+                    props.forEach(prop => {
+                        measurementDiv.style[prop] = style[prop];
+                    });
+                    measurementDiv.style.position = 'absolute';
+                    measurementDiv.style.top = '-9999px';
+                    measurementDiv.style.left = '0px';
+                    measurementDiv.style.width = textarea.clientWidth + 'px';
+                    measurementDiv.style.visibility = 'hidden';
+                }
+                
+                syncStyles();
+                
+                return {
+                    getCoords: function(position) {
+                        measurementDiv.style.width = textarea.clientWidth + 'px';
+                        const text = textarea.value;
+                        const before = text.substring(0, position);
+                        
+                        measurementDiv.innerHTML = '';
+                        const beforeSpan = document.createElement('span');
+                        beforeSpan.textContent = before;
+                        const targetSpan = document.createElement('span');
+                        targetSpan.textContent = ' ';
+                        
+                        measurementDiv.appendChild(beforeSpan);
+                        measurementDiv.appendChild(targetSpan);
+                        
+                        return {
+                            top: targetSpan.offsetTop,
+                            left: targetSpan.offsetLeft,
+                            height: targetSpan.offsetHeight
+                        };
+                    },
+                    sync: syncStyles
+                };
+            })(editor);
+            
+            function showInterimAtCursor(text, startPos) {
+                if (!text) {
+                    interimOverlay.textContent = '';
+                    interimOverlay.style.display = 'none';
+                    return;
+                }
+                
+                const coords = textMetrics.getCoords(startPos);
+                interimOverlay.textContent = text;
+                interimOverlay.style.top = (coords.top - editor.scrollTop) + 'px';
+                interimOverlay.style.left = (coords.left - editor.scrollLeft) + 'px';
+                interimOverlay.style.display = 'block';
+            }
+
+            // Initialize speech recognition
+            initializeSpeechRecognition();
+
+            // --- Remote Cursor & Selection Sync Logic (Optimized) ---
+            const remoteCursors = {}; // { id: { cursorEl, selectionEl, start, end, name } }
+            let cursorUpdateThrottle;
+
+            const styles = window.getComputedStyle(editor);
+			// Interim overlay element for collaborator (for future implementation)
+			const collaboratorInterimOverlay = document.createElement('div');
+			collaboratorInterimOverlay.className = 'interim-overlay';
+			remoteCursorsOverlay.appendChild(collaboratorInterimOverlay);
+			
+            function renderRemoteCursors() {
+                if (!remoteCursorsOverlay) return;
+
+                Object.values(remoteCursors).forEach(data => {
+                    const startCoords = textMetrics.getCoords(data.start);
+                    data.cursorEl.style.top = `${startCoords.top - editor.scrollTop}px`;
+                    data.cursorEl.style.left = `${startCoords.left - editor.scrollLeft}px`;
+                    data.cursorEl.style.height = `${startCoords.height}px`;
+
+                    if (data.start === data.end) {
+                        data.selectionEl.style.display = 'none';
+                    } else {
+                        data.selectionEl.style.display = 'block';
+                        const endCoords = textMetrics.getCoords(data.end);
+                        if (startCoords.top === endCoords.top) {
+                            data.selectionEl.style.top = `${startCoords.top - editor.scrollTop}px`;
+                            data.selectionEl.style.left = `${startCoords.left - editor.scrollLeft}px`;
+                            data.selectionEl.style.width = `${endCoords.left - startCoords.left}px`;
+                            data.selectionEl.style.height = `${startCoords.height}px`;
+                        } else {
+                            data.selectionEl.style.display = 'none';
+                        }
+                    }
+                });
+            }
+
+            function hashCode(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                return Math.abs(hash);
+            }
+
+            socket.on('cursor_update', (data) => {
+                if (!data.id || data.id === socket.id) return;
+
+                if (!remoteCursors[data.id]) {
+                    const color = `hsl(${hashCode(data.id) % 360}, 90%, 60%)`;
+                    const name = `User ${data.id.substring(0, 4)}`;
+                    
+                    const cursorEl = document.createElement('div');
+                    cursorEl.className = 'remote-cursor';
+                    cursorEl.style.backgroundColor = color;
+                    cursorEl.setAttribute('data-label', name);
+                    
+                    const selectionEl = document.createElement('div');
+                    selectionEl.className = 'remote-selection';
+                    selectionEl.style.backgroundColor = color;
+
+                    remoteCursorsOverlay.appendChild(cursorEl);
+                    remoteCursorsOverlay.appendChild(selectionEl);
+
+                    remoteCursors[data.id] = { cursorEl, selectionEl, name };
+                }
+
+                remoteCursors[data.id].start = data.start;
+                remoteCursors[data.id].end = data.end;
+                renderRemoteCursors();
+            });
+
+            socket.on('user_disconnected', (data) => {
+                if (data.id && remoteCursors[data.id]) {
+                    remoteCursors[data.id].cursorEl.remove();
+                    remoteCursors[data.id].selectionEl.remove();
+                    delete remoteCursors[data.id];
                 }
             });
 
-            // Initial UI setup
-            updateUI();
-            scheduleLineNumberUpdate();
-
-            // Easter Egg: Night Mode Toggle
-            const authorSignature = document.querySelector('.author-signature');
-            if (authorSignature) {
-                authorSignature.style.cursor = 'pointer'; // Make it look clickable
-                authorSignature.title = '切換日夜間模式'; // Add a tooltip
-
-                const applyTheme = (theme) => {
-                    if (theme === 'night') {
-                        document.body.classList.add('night-mode');
-                    } else {
-                        document.body.classList.remove('night-mode');
-                    }
+            document.addEventListener('selectionchange', () => {
+                if (document.activeElement === editor) {
+                    clearTimeout(cursorUpdateThrottle);
+                    cursorUpdateThrottle = setTimeout(() => {
+                        if (socket.connected) {
+                            socket.emit('cursor_sync', {
+                                room: ROOM_ID,
+                                id: socket.id,
+                                start: editor.selectionStart,
+                                end: editor.selectionEnd
+                            });
+                        }
+                    }, 50);
                 }
+            });
 
-                authorSignature.addEventListener('click', () => {
-                    const isNightMode = document.body.classList.contains('night-mode');
-                    const newTheme = isNightMode ? 'day' : 'night';
-                    localStorage.setItem('theme', newTheme);
-                    applyTheme(newTheme);
+            editor.addEventListener('scroll', renderRemoteCursors);
+            window.addEventListener('resize', () => {
+                textMetrics.sync();
+                renderRemoteCursors();
+            });
+            [directorFontFamilySelect, directorFontSizeInput, directorLineHeightInput].forEach(el => {
+                el.addEventListener('input', () => {
+                    setTimeout(() => {
+                        textMetrics.sync();
+                        renderRemoteCursors();
+                    }, 0);
                 });
+            });
 
-                // On page load, apply the saved theme
-                const savedTheme = localStorage.getItem('theme');
-                if (savedTheme) {
-                    applyTheme(savedTheme);
-                }
-            }
+            const originalStateUpdateHandler = socket._callbacks['$state_update'][0];
+            socket.off('state_update');
+            socket.on('state_update', (data) => {
+                originalStateUpdateHandler(data);
+                Promise.resolve().then(renderRemoteCursors);
+            });
+            const originalPatchHandler = socket._callbacks['$script_patched'][0];
+            socket.off('script_patched');
+            socket.on('script_patched', (data) => {
+                originalPatchHandler(data);
+                Promise.resolve().then(renderRemoteCursors);
+            });
+			
+			socket.on('interim_text', (data) => {
+				if (!data || !data.text) {
+					collaboratorInterimOverlay.textContent = '';
+					collaboratorInterimOverlay.style.display = 'none';
+					return;
+				}
+				const coords = textMetrics.getCoords(data.start || 0);
+				collaboratorInterimOverlay.textContent = data.text;
+				collaboratorInterimOverlay.style.top = (coords.top - editor.scrollTop) + 'px';
+				collaboratorInterimOverlay.style.left = (coords.left - editor.scrollLeft) + 'px';
+				collaboratorInterimOverlay.style.display = 'block';
+			});			
+			
         });
     </script>
 </body>
