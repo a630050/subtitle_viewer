@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>協作編輯器</title>
+    <style>
+        /* --- 基礎樣式 --- */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background-color: #f0f2f5; color: #212529; overflow: hidden; transition: background-color 0.3s, color 0.3s; }
+        .main-container { display: flex; width: 100%; height: 100%; position: relative; }
+        .editor-pane { flex: 3; display: flex; flex-direction: column; padding: 1em; height: 100%; box-sizing: border-box; gap: 1em; transition: flex-grow 0.3s ease-in-out; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; flex-wrap: wrap; gap: 10px;}
+        .top-bar h3 { font-size: 1.5em; margin: 0; }
+        .file-buttons { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .file-buttons button, .file-buttons select { padding: 4px 8px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+.file-buttons .share-btn { background-color: #0d6efd; color: #fff; border-color: #0d6efd; }
+.file-buttons .share-btn:hover { background-color: #0b5ed7; border-color: #0a58ca; }
+body.dark-mode .file-buttons .share-btn { background-color: #375a7f; border-color: #375a7f; }
+		.file-buttons .speech-btn { background-color: #4CAF50; color: white; border: none; transition: background-color 0.3s; }
+		.file-buttons .speech-btn.recording { background-color: #f44336; }
+        .editor-wrapper { position: relative; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
+        #script-editor {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            font-family: monospace;
+            font-size: 24px;
+            border: none;
+            padding: 14px 36px; /* 左右留白再加大，確保不被左右收合按鈕(30px)遮住文字 */
+            resize: none;
+            outline: none;
+            background-color: #fff;
+            color: #000;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        #interim-tail {
+            position: absolute;
+            left: 36px;
+            right: 72px;
+            bottom: 16px;
+            z-index: 4;
+            display: none;
+            pointer-events: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: monospace;
+            font-size: 24px;
+            line-height: 1.2;
+            color: rgba(0, 0, 0, 0.55);
+        }
+        #interim-tail.visible {
+            display: block;
+        }
+        #interim-tail.holding-space {
+            visibility: hidden;
+        }
+        #status { position: fixed; bottom: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background-color: #fff; padding: 20px; border-radius: 5px; text-align: center; color: #333; }
+        #file-input { display: none; }
+
+        /* --- 設定面板樣式 --- */
+        .settings-pane { flex: 0 0 260px; width: 260px; border-left: 1px solid #ccc; background-color: #fff; padding: 1em; overflow-y: auto; transition: all 0.3s ease-in-out; min-width: 220px; }
+        .settings-pane h4 { margin-top: 1.5em; margin-bottom: 0.8em; padding-bottom: 0.3em; border-bottom: 1px solid #eee; }
+        .settings-pane h4:first-of-type { margin-top: 0; }
+        .style-control { margin-bottom: 15px; }
+        .style-control label { display: block; margin-bottom: 5px; font-size: 14px; color: #333; }
+        .style-control input, .style-control select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .setting-tip {
+            margin-left: 6px;
+            color: #2b7de9;
+            cursor: help;
+            font-weight: 700;
+        }
+        .setting-note {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #555;
+        }
+/* 美化顏色選取器 */
+.style-control input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+  cursor: pointer;
+}
+.style-control input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 4px;
+  border-radius: 8px;
+}
+.style-control input[type="color"]::-webkit-color-swatch {
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+}
+.style-control input[type="color"]::-moz-color-swatch {
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+}
+.style-control input[type="color"]:focus {
+  outline: 2px solid #80bdff;
+  outline-offset: 2px;
+}
+/* 設定面板內的動作按鈕組 */
+.settings-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.settings-actions button { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+body.dark-mode .settings-actions button { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+/* 深色模式下的顏色選取器樣式 */
+body.dark-mode .style-control input[type="color"] {
+  background-color: #2c2c2c;
+  border-color: #555;
+}
+body.dark-mode .setting-note {
+  color: #b7b7b7;
+}
+body.dark-mode .style-control input[type="color"]::-webkit-color-swatch {
+  border-color: rgba(255,255,255,0.25);
+}
+body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
+  border-color: rgba(255,255,255,0.25);
+}
+		#dark-mode-toggle {
+			display: inline-flex;
+			align-items: center;   /* 垂直置中 */
+			justify-content: center; /* 水平置中（保險）*/
+			padding: 6px 10px;      /* 比左側 4px 稍小，但高一點 */
+			font-size: 13px;        /* 比左側 14px 稍小 */
+			line-height: 1;         /* 移除額外行高，避免看起來偏上/偏下 */
+			margin-left: 15px;
+			background-color: transparent;
+			border: 1px solid #ccc;
+			color: #555;
+			cursor: pointer;
+		}
+		
+		/* --- 分享連結樣式 --- */
+        #share-link-anchor {
+            display: block;
+            padding: 8px;
+            background-color: #f0f2f5;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            color: #0d6efd;
+            text-decoration: underline;
+            word-break: break-all;
+            font-family: monospace;
+        }
+        body.dark-mode #share-link-anchor {
+            background-color: #3a3a3a;
+            border-color: #555;
+            color: #82c0ff;
+        }
+
+        /* === 夜間模式樣式 === */
+        body.dark-mode { background-color: #1a1a1a; color: #e0e0e0; }
+        body.dark-mode .settings-pane { background-color: #2c2c2c; border-left-color: #444; }
+        body.dark-mode .settings-pane h4 { border-bottom-color: #444; }
+        body.dark-mode .style-control label { color: #e0e0e0; }
+        body.dark-mode .style-control input, body.dark-mode .style-control select,
+        body.dark-mode .file-buttons button, body.dark-mode .file-buttons select { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .style-control input[type="color"] { border-width: 2px; }
+        body.dark-mode .editor-wrapper { border-color: #444; }
+        body.dark-mode #script-editor { background-color: #2c2c2c; color: #e0e0e0; }
+        body.dark-mode #interim-tail { color: rgba(255, 255, 255, 0.65); }
+        body.dark-mode .modal-content { background-color: #3a3a3a; color: #e0e0e0; }
+        body.dark-mode #dark-mode-toggle {
+			background-color: transparent;
+			border-color: #555;
+			color: #aaa;
+		}
+        body.dark-mode #status { background-color: rgba(255,255,255,0.2); color: #fff; }
+
+        /* === 面板收合按鈕樣式 (改良) === */
+        #pane-toggle-btn {
+            position: absolute;
+            top: 50%;
+            right: 260px;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 64px;
+            background-color: #6c757d;
+            color: #fff;
+            border: 1px solid rgba(0,0,0,0.15);
+            border-right: none; /* 與面板邊界貼齊，避免多一道線 */
+            border-radius: 10px 0 0 10px;
+            cursor: pointer;
+            z-index: 100; /* 確保覆蓋在內容之上 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            transition: right 0.25s ease-in-out, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #pane-toggle-btn:hover {
+            background-color: #5a6268;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        #pane-toggle-btn:active {
+            background-color: #545b62;
+        }
+        /* 當面板收合時的樣式 */
+        .main-container.settings-collapsed .settings-pane {
+            flex: 0 0 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            border-left: none;
+            opacity: 0;
+        }
+        .main-container.settings-collapsed #pane-toggle-btn {
+            right: 0; /* 按鈕移動到最右邊 */
+        }
+        /* 夜間模式下的按鈕樣式 */
+        body.dark-mode #pane-toggle-btn {
+            background-color: #3a3a3a;
+            border-color: #555;
+        }
+        .scroll-to-bottom-btn {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: opacity 0.2s, transform 0.2s;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+        }
+        .scroll-to-bottom-btn.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .scroll-to-bottom-btn:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        .scroll-to-bottom-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+        body.dark-mode .scroll-to-bottom-btn {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+        body.dark-mode .scroll-to-bottom-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        /* --- 片段面板樣式（左側） --- */
+        .snippets-pane { flex: 0 0 260px; width: 260px; border-right: 1px solid #ccc; background-color: #fff; padding: 1em; overflow-y: auto; transition: all 0.3s ease-in-out; min-width: 220px; }
+        .snippets-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        .snippet-item { border: 1px solid #ccc; border-radius: 6px; padding: 8px; background-color: #fff; display: grid; grid-template-columns: 28px 1fr auto; grid-template-rows: auto; grid-template-areas: 'label textarea button'; gap: 8px; align-items: start; }
+        .snippet-item label { grid-area: label; display: inline-flex; justify-content: center; align-items: center; width: 28px; height: 28px; background: #f0f2f5; border-radius: 50%; font-weight: 600; color: #555; border: 1px solid #ddd; }
+        .snippet-item textarea { grid-area: textarea; width: 100%; min-height: 54px; resize: vertical; font-size: 14px; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .snippet-item .snippet-insert-btn { grid-area: button; padding: 6px 10px; font-size: 13px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+        .snippets-actions { margin-top: 8px; }
+        .snippets-actions button { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
+
+        /* 收合時樣式（左側） */
+        .main-container.snippets-collapsed .snippets-pane { flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; padding: 0 !important; overflow: hidden; border-right: none; opacity: 0; }
+        .main-container.snippets-collapsed #snippets-toggle-btn { left: 0; }
+
+        /* 左側面板收合按鈕樣式 */
+        #snippets-toggle-btn { position: absolute; top: 50%; left: 260px; transform: translateY(-50%); width: 30px; height: 64px; background-color: #6c757d; color: #fff; border: 1px solid rgba(0,0,0,0.15); border-left: none; border-radius: 0 10px 10px 0; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: left 0.25s ease-in-out, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease; } /* 與右側寬度一致: 30px */
+        #snippets-toggle-btn:hover { background-color: #5a6268; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #snippets-toggle-btn:active { background-color: #545b62; }
+
+        /* 深色模式支援 - 左側片段面板 */
+        body.dark-mode .snippets-pane { background-color: #2c2c2c; border-right-color: #444; }
+        body.dark-mode .snippet-item { background-color: #2c2c2c; border-color: #555; }
+        body.dark-mode .snippet-item label { background-color: #3a3a3a; color: #ddd; border-color: #555; }
+        body.dark-mode .snippet-item textarea { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+        body.dark-mode .snippet-item .snippet-insert-btn, body.dark-mode .snippets-actions button { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
+        body.dark-mode #snippets-toggle-btn { background-color: #3a3a3a; border-color: #555; }
+		
+        /* === IME Sandbox Overlay === */
+        #ime-sandbox {
+            position: absolute;
+            display: none; /* 由 JS 控制顯示 */
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid #0d6efd;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            padding: 2px 6px;
+            min-width: 100px;
+            z-index: 6; /* 需高於 textarea (z-index: 5) */
+            font-family: inherit; /* 繼承主編輯器的字體 */
+            font-size: inherit;
+            line-height: inherit;
+            color: #000;
+            outline: none;
+        }
+        body.dark-mode #ime-sandbox {
+            background-color: rgba(40, 40, 40, 0.95);
+            border-color: #82c0ff;
+            color: #e0e0e0;
+        }		
+		
+
+        /* === Remote Cursors & Selections === */
+        #remote-cursors-overlay {
+            position: absolute;
+            /* 移除固定的 padding，讓它和 textarea 完美重疊 */
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 5;
+            overflow: hidden; /* 確保游標不會畫到外面 */
+        }
+        .remote-cursor {
+            position: absolute;
+            width: 2px;
+            background-color: red; /* 顏色會由 JS 動態設定 */
+            opacity: 0.9;
+            transition: top 0.05s linear, left 0.05s linear; /* 加快過渡，感覺更即時 */
+        }
+        .remote-cursor::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -20px; /* 向上偏移更多，避免擋住游標本身 */
+            left: -4px;
+            background-color: inherit;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+        .remote-selection {
+            position: absolute;
+            background-color: blue; /* 顏色會由 JS 動態設定 */
+            opacity: 0.3;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="main-container settings-collapsed snippets-collapsed">
+        <!-- 左側：片段面板（可收合） -->
+        <div id="snippets-pane" class="snippets-pane" aria-label="片段插入面板">
+            <div id="snippets-body">
+                <h3 style="margin-top: 0;">常用片段</h3>
+                <div class="snippets-grid">
+                    <!-- 10 個片段格，1~9 與 0 對應快捷鍵 -->
+                    <div class="snippet-item"><label>1</label><textarea id="snippet-1" placeholder="Ctrl+1 插入"></textarea><button data-snippet="1" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>2</label><textarea id="snippet-2" placeholder="Ctrl+2 插入"></textarea><button data-snippet="2" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>3</label><textarea id="snippet-3" placeholder="Ctrl+3 插入"></textarea><button data-snippet="3" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>4</label><textarea id="snippet-4" placeholder="Ctrl+4 插入"></textarea><button data-snippet="4" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>5</label><textarea id="snippet-5" placeholder="Ctrl+5 插入"></textarea><button data-snippet="5" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>6</label><textarea id="snippet-6" placeholder="Ctrl+6 插入"></textarea><button data-snippet="6" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>7</label><textarea id="snippet-7" placeholder="Ctrl+7 插入"></textarea><button data-snippet="7" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>8</label><textarea id="snippet-8" placeholder="Ctrl+8 插入"></textarea><button data-snippet="8" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>9</label><textarea id="snippet-9" placeholder="Ctrl+9 插入"></textarea><button data-snippet="9" class="snippet-insert-btn">插入</button></div>
+                    <div class="snippet-item"><label>0</label><textarea id="snippet-0" placeholder="Ctrl+0 插入"></textarea><button data-snippet="0" class="snippet-insert-btn">插入</button></div>
+                </div>
+            </div>
+            <div class="snippets-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px;">
+                <button id="snippets-save-btn">儲存片語</button>
+                <button id="snippets-load-btn">載入片語</button>
+            </div>
+            <div class="snippets-actions" style="margin-top: 8px;">
+                <button id="snippets-clear-btn" style="width: 100%;">清空全部片段</button>
+            </div>
+            <input id="snippets-file-input" type="file" accept="application/json" style="display:none" />
+        </div>
+        <div id="snippets-toggle-btn" tabindex="0" role="button" aria-controls="snippets-pane" aria-expanded="false" aria-label="展開片段">&raquo;</div>
+        <div class="editor-pane">
+            <div class="top-bar">
+                <h3>協作文本編輯區</h3>
+                <div class="file-buttons">
+                    <button id="share-viewer-btn" class="share-btn">分享觀眾</button>
+                    <select id="speech-lang-select">
+                        <option value="zh-TW" selected>繁體中文</option>
+                        <option value="en-US">English</option>
+                        <option value="ja-JP">日本語</option>
+                    </select>
+                    <button id="speech-toggle-btn" class="speech-btn">開始語音識別</button>
+                    <button id="import-btn">匯入文本</button>
+                    <button id="export-btn">匯出文本</button>
+                    <button id="clear-btn">清除文本</button>
+                    <button id="replace-words-btn">置換詞彙</button>
+                    <button id="leave-room-btn">離開房間</button>
+					<button id="dark-mode-toggle">程式作者：徐承佑</button>
+                </div>
+            </div>
+            <div class="editor-wrapper">
+                <div id="remote-cursors-overlay"></div>
+                <textarea id="script-editor" placeholder="在此輸入或貼上文本..."></textarea>
+                <div id="interim-tail" aria-live="polite"></div>
+				<div id="ime-sandbox" contenteditable="true" style="display: none;"></div>
+                <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" title="捲動到底部">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+        </div>
+        <div id="settings-pane" class="settings-pane" aria-label="排版設定面板">
+            <div id="settings-body">
+                
+                <h4>編輯區設定</h4>
+				<div class="style-control">
+					<label for="director-speech-break-mode">語音轉錄換行</label>
+					<select id="director-speech-break-mode">
+						<option value="join">連續模式</option>
+						<option value="newline" selected>換行模式</option>
+						<option value="double-newline">空行模式</option>
+					</select>
+				</div>
+                <div class="style-control">
+                    <label for="editor-idle-seconds">
+                        自動跳出編輯區秒數
+                        <span class="setting-tip" title="人工編輯者進入編輯區會暫停落地文字同步，修改後請按 Esc 跳出；若閒置 3 秒未有鍵盤、滑鼠或組字更新，會自動退出編輯。">ⓘ</span>
+                    </label>
+                    <input type="number" id="editor-idle-seconds" min="1" max="60" step="1" value="3">
+                    <small class="setting-note">人工編輯者進入編輯區會暫停落地文字同步，修改後請按 Esc 跳出；若閒置 3 秒未動作，系統會自動退出編輯並恢復同步。</small>
+                </div>
+                <div class="style-control">
+                    <label for="director-font-family-select">字體</label>
+                    <select id="director-font-family-select">
+                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif">微軟正黑體</option>
+                        <option value="KaiTi, '標楷體', serif">標楷體</option>
+                        <option value="MingLiU, '細明體', serif">細明體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="director-font-size-input">字體大小 (px)</label>
+                    <input type="number" id="director-font-size-input" min="8" max="72" step="1" value="24">
+                </div>
+                <div class="style-control">
+                    <label for="director-line-height-input">行距</label>
+                    <input type="number" id="director-line-height-input" min="1" max="3" step="0.1" value="1.2">
+                </div>
+                <div class="style-control">
+                    <label for="director-font-style-select">字體樣式</label>
+                    <select id="director-font-style-select">
+                        <option value="normal">正常</option>
+                        <option value="bold">粗體</option>
+                        <option value="italic">斜體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="director-font-color-input">字體顏色</label>
+                    <input type="color" id="director-font-color-input" value="#000000">
+                </div>
+                <div class="style-control">
+                    <label for="director-bg-color-input">背景顏色</label>
+                    <input type="color" id="director-bg-color-input" value="#FFFFFF">
+                </div>
+
+                <hr style="margin: 2em 0; border: none; border-top: 1px solid #ddd;">
+                
+                <h4>觀眾端設定</h4>
+                <div class="style-control">
+                    <label for="viewer-font-family-select">字體</label>
+                    <select id="viewer-font-family-select">
+                        <option value="'Microsoft JhengHei', '蘋方-繁', sans-serif">微軟正黑體</option>
+                        <option value="KaiTi, '標楷體', serif">標楷體</option>
+                        <option value="MingLiU, '細明體', serif">細明體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="viewer-font-size-input">字體大小 (px)</label>
+                    <input type="number" id="viewer-font-size-input" min="8" max="120" step="1" value="60">
+                </div>
+                <div class="style-control">
+                    <label for="viewer-line-height-input">行距</label>
+                    <input type="number" id="viewer-line-height-input" min="1" max="3" step="0.1" value="1.2">
+                </div>
+                <div class="style-control">
+                    <label for="viewer-font-style-select">字體樣式</label>
+                    <select id="viewer-font-style-select">
+                        <option value="normal">正常</option>
+                        <option value="bold">粗體</option>
+                        <option value="italic">斜體</option>
+                    </select>
+                </div>
+                <div class="style-control">
+                    <label for="viewer-font-color-input">字體顏色</label>
+                    <input type="color" id="viewer-font-color-input" value="#FFFFFF">
+                </div>
+                <div class="style-control">
+                    <label for="viewer-bg-color-input">背景顏色</label>
+                    <input type="color" id="viewer-bg-color-input" value="#000000">
+                </div>
+            </div>
+
+            <div class="settings-actions" style="margin-top: 8px; margin-bottom: 50px;">
+                <button id="settings-save-btn">匯出設定</button>
+                <button id="settings-load-btn">匯入設定</button>
+                <input id="settings-file-input" type="file" accept="application/json" style="display:none" />
+            </div>
+        </div>
+
+        <!-- 按鈕：定位在主容器上，具可鍵盤操作與ARIA說明 -->
+        <div id="pane-toggle-btn" tabindex="0" role="button" aria-controls="settings-pane" aria-expanded="false" aria-label="展開設定">&laquo;</div>
+    </div>
+
+    <div id="import-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h4>載入模式</h4>
+            <p>請選擇匯入文本的方式：</p>
+            <button id="import-raw-btn">原文載入</button>
+            <button id="import-smart-btn">智能載入</button>
+            <button id="import-cancel-btn">取消</button>
+            <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px; color: #666; text-align: left;">
+                <strong>智能載入：</strong><br>
+                • 自動移除空白行<br>
+                • 將長句按標点符號分割（每行最多20字）<br>
+                • 優先在逗號、句號、問號、驚嘆號等標点處分行<br>
+                <br>
+                <strong>原文載入：</strong>保持原始格式，不做任何修改
+            </div>
+        </div>
+    </div>
+
+    <div id="replace-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h4 style="margin-top: 0;">置換詞彙</h4>
+            <div class="replace-control" style="margin: 15px 0; text-align: left;">
+                <label for="find-input" style="display: block; margin-bottom: 5px;">尋找目標：</label>
+                <input type="text" id="find-input" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div class="replace-control" style="margin: 15px 0; text-align: left;">
+                <label for="replace-input" style="display: block; margin-bottom: 5px;">置換為：</label>
+                <input type="text" id="replace-input" style="width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+                 <button id="replace-cancel-btn">取消</button>
+                 <button id="replace-all-btn">全部置換</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="status">正在連線...</div>
+
+    <!-- 分享連結/QR Code Modal -->
+    <div id="share-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 520px; text-align: left;">
+            <h4 style="margin-top: 0;">分享觀眾連結</h4>
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+                <div id="share-qrcode" style="width:180px; height:180px; border:1px solid #eee;"></div>
+                <div style="flex:1;">
+                    <label style="display:block; font-size: 14px; color:#666; margin-bottom:6px;">觀眾端連結 (可點擊)</label>
+                    <!-- 將 input 替換為 a 標籤 -->
+                    <a id="share-link-anchor" href="#" target="_blank" rel="noopener noreferrer">正在產生連結...</a>
+                    <div style="margin-top:8px; display:flex; gap:8px;">
+                        <button id="share-copy-btn">複製連結</button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 16px; text-align: right;">
+                <button id="share-close-btn">關閉</button>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="file-input" accept=".txt">
+
+    <script src="https://cdn.jsdelivr.net/gh/google/diff-match-patch@master/javascript/diff_match_patch.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io({ transports: ["websocket"] });
+            const ROOM_ID = "{{ room_id }}";
+
+            // Editor and Collaboration Elements
+            const editor = document.getElementById('script-editor');
+            const interimTail = document.getElementById('interim-tail');
+            const statusDiv = document.getElementById('status');
+            const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+			
+			// === 新增：IME 沙箱相關元素與狀態 ===
+            const imeSandbox = document.getElementById('ime-sandbox');
+            let isSandboxActive = false;
+            let sandboxAnchorPosition = 0;
+            let isEditMode = false;
+            
+            // File & Control Buttons
+            const clearBtn = document.getElementById('clear-btn');
+            const importBtn = document.getElementById('import-btn');
+            const exportBtn = document.getElementById('export-btn');
+            const fileInput = document.getElementById('file-input');
+            const importModal = document.getElementById('import-modal');
+            const importRawBtn = document.getElementById('import-raw-btn');
+            const importSmartBtn = document.getElementById('import-smart-btn');
+            const importCancelBtn = document.getElementById('import-cancel-btn');
+            const replaceWordsBtn = document.getElementById('replace-words-btn');
+            const replaceModal = document.getElementById('replace-modal');
+            const findInput = document.getElementById('find-input');
+            const replaceInput = document.getElementById('replace-input');
+            const replaceAllBtn = document.getElementById('replace-all-btn');
+            const replaceCancelBtn = document.getElementById('replace-cancel-btn');
+            const leaveRoomBtn = document.getElementById('leave-room-btn');
+            const speechLangSelect = document.getElementById('speech-lang-select');
+            const shareViewerBtn = document.getElementById('share-viewer-btn');
+            const speechToggleBtn = document.getElementById('speech-toggle-btn');
+            const shareModal = document.getElementById('share-modal');
+            const shareLinkAnchor = document.getElementById('share-link-anchor');  // 修改變數名稱和 ID
+            const shareCopyBtn = document.getElementById('share-copy-btn');
+			const shareCloseBtn = document.getElementById('share-close-btn'); 
+            const shareQrCodeContainer = document.getElementById('share-qrcode');
+
+            // --- Director Style Settings Elements ---
+            const directorFontFamilySelect = document.getElementById('director-font-family-select');
+            const directorFontSizeInput = document.getElementById('director-font-size-input');
+            const directorFontStyleSelect = document.getElementById('director-font-style-select');
+            const directorFontColorInput = document.getElementById('director-font-color-input');
+            const directorBgColorInput = document.getElementById('director-bg-color-input');
+            const directorLineHeightInput = document.getElementById('director-line-height-input');
+			const directorSpeechBreakMode = document.getElementById('director-speech-break-mode');
+            const editorIdleSecondsInput = document.getElementById('editor-idle-seconds');
+            // --- Viewer Style Settings Elements ---
+            const viewerFontFamilySelect = document.getElementById('viewer-font-family-select');
+            const viewerFontSizeInput = document.getElementById('viewer-font-size-input');
+            const viewerFontStyleSelect = document.getElementById('viewer-font-style-select');
+            const viewerFontColorInput = document.getElementById('viewer-font-color-input');
+            const viewerBgColorInput = document.getElementById('viewer-bg-color-input');
+            const viewerLineHeightInput = document.getElementById('viewer-line-height-input');
+
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const settingsSaveBtn = document.getElementById('settings-save-btn');
+            const settingsLoadBtn = document.getElementById('settings-load-btn');
+            const settingsFileInput = document.getElementById('settings-file-input');
+
+            // Collaboration State
+            let dmp = new diff_match_patch();
+            let lastSentText = '';
+            let patchUpdateTimeout;
+            let localState = { raw_text: '' };
+            let importedFileContent = '';
+            let latency = 0;
+            let connectionCounts = null;
+            let latestInterimText = '';
+            let isComposing = false;
+            let lastEditActivityAt = Date.now();
+            let pendingServerText = null;
+            let deferredResyncTimer = null;
+            let editAutoExitTimer = null;
+            let shouldAutoScrollEditor = true;
+            const editorPaddingBottomBase = parseFloat(window.getComputedStyle(editor).paddingBottom) || 14;
+            const INTERIM_COLLAPSE_MAX_HOLD_MS = 1800;
+            let interimCollapseTimer = null;
+            let interimTailHoldHeightPx = 0;
+            let isHoldingInterimTailSpace = false;
+
+            // --- Auto-scroll Logic ---
+            function isScrolledToBottom(el) {
+                // 嚴格判定：除非使用者主動上滑超過 0.8 頁的高度，否則都會自動置底
+                const threshold = Math.max(150, el.clientHeight * 0.8);
+                return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+            }
+
+            let isProgrammaticScrollEditor = false;
+            function scrollToBottom(el) {
+                isProgrammaticScrollEditor = true;
+                el.scrollTop = el.scrollHeight;
+                setTimeout(() => { isProgrammaticScrollEditor = false; }, 50);
+            }
+
+            function handleEditorScroll() {
+                if (isProgrammaticScrollEditor) return;
+                const atBottom = isScrolledToBottom(editor);
+                shouldAutoScrollEditor = atBottom;
+                if (atBottom) {
+                    scrollToBottomBtn.classList.remove('visible');
+                } else {
+                    scrollToBottomBtn.classList.add('visible');
+                }
+            }
+
+            function isSpeechOwner() {
+                return Boolean(localState && localState.speech_user && localState.speech_user === socket.id);
+            }
+             
+            function wrapUpdateFunction(updateFn) {
+                return function(...args) {
+                    if (isScrolledToBottom(editor)) {
+                        shouldAutoScrollEditor = true;
+                    }
+                    const savedScrollTop = editor.scrollTop;
+                    const wasAutoScroll = shouldAutoScrollEditor;
+                    updateFn(...args);
+                    if (wasAutoScroll) {
+                        scrollToBottom(editor);
+                        setTimeout(() => { if (shouldAutoScrollEditor) scrollToBottom(editor); handleEditorScroll(); }, 10);
+                        setTimeout(() => { if (shouldAutoScrollEditor) scrollToBottom(editor); handleEditorScroll(); }, 100);
+                    } else {
+                        editor.scrollTop = savedScrollTop;
+                        handleEditorScroll();
+                    }
+                }
+            }
+
+            function clearInterimCollapseTimer() {
+                if (!interimCollapseTimer) return;
+                clearTimeout(interimCollapseTimer);
+                interimCollapseTimer = null;
+            }
+
+            function getInterimTailHeightPx() {
+                return Math.ceil(interimTail.getBoundingClientRect().height || 0);
+            }
+
+            function releaseInterimTailHoldSpace() {
+                clearInterimCollapseTimer();
+                isHoldingInterimTailSpace = false;
+                interimTail.textContent = '';
+                interimTail.style.minHeight = '';
+                interimTail.classList.remove('holding-space');
+                interimTail.classList.remove('visible');
+                syncInterimTailLayout();
+            }
+
+            function holdInterimTailSpace() {
+                const measuredHeight = getInterimTailHeightPx();
+                if (measuredHeight > 0) {
+                    interimTailHoldHeightPx = measuredHeight;
+                }
+                if (interimTailHoldHeightPx <= 0) {
+                    releaseInterimTailHoldSpace();
+                    return;
+                }
+                isHoldingInterimTailSpace = true;
+                interimTail.textContent = '\u00A0';
+                interimTail.style.minHeight = `${interimTailHoldHeightPx}px`;
+                interimTail.classList.add('visible');
+                interimTail.classList.add('holding-space');
+                syncInterimTailLayout();
+                clearInterimCollapseTimer();
+                interimCollapseTimer = setTimeout(() => {
+                    releaseInterimTailHoldSpace();
+                    if (shouldAutoScrollEditor) scrollToBottom(editor);
+                }, INTERIM_COLLAPSE_MAX_HOLD_MS);
+            }
+
+            function notifyMainTextUpdated() {
+                if (isHoldingInterimTailSpace) {
+                    releaseInterimTailHoldSpace();
+                }
+            }
+
+            function renderInterimTail() {
+                const text = String(latestInterimText || '');
+                if (!text.trim()) {
+                    const shouldHoldSpace = isHoldingInterimTailSpace || interimTail.classList.contains('visible');
+                    if (shouldHoldSpace) {
+                        holdInterimTailSpace();
+                    } else {
+                        releaseInterimTailHoldSpace();
+                    }
+                    return;
+                }
+                clearInterimCollapseTimer();
+                isHoldingInterimTailSpace = false;
+                interimTail.textContent = text;
+                interimTail.style.minHeight = '';
+                interimTail.classList.add('visible');
+                interimTail.classList.remove('holding-space');
+                syncInterimTailLayout();
+                interimTailHoldHeightPx = getInterimTailHeightPx();
+                if (shouldAutoScrollEditor) {
+                    scrollToBottom(editor);
+                    handleEditorScroll();
+                }
+            }
+
+            function syncInterimTailLayout() {
+                const tailHeight = interimTail.classList.contains('visible')
+                    ? Math.ceil(interimTail.getBoundingClientRect().height)
+                    : 0;
+                const extraBottomPadding = tailHeight > 0 ? tailHeight + 12 : 0;
+                editor.style.paddingBottom = `${editorPaddingBottomBase + extraBottomPadding}px`;
+            }
+
+            function setInterimTailText(text) {
+                latestInterimText = String(text || '');
+                renderInterimTail();
+            }
+
+            function shouldDeferServerApply() {
+                if (isSpeechOwner()) return false;
+                if (isEditMode) return true;
+                if (isComposing) return true;
+                return false;
+            }
+
+            function getEditIdleSeconds() {
+                const raw = Number.parseInt(editorIdleSecondsInput?.value ?? '3', 10);
+                if (!Number.isFinite(raw)) return 3;
+                return Math.min(60, Math.max(1, raw));
+            }
+
+            function markEditActivity() {
+                lastEditActivityAt = Date.now();
+            }
+
+            function resetEditAutoExitTimer() {
+                if (editAutoExitTimer) {
+                    clearTimeout(editAutoExitTimer);
+                    editAutoExitTimer = null;
+                }
+                if (!isEditMode) return;
+                const timeoutMs = getEditIdleSeconds() * 1000;
+                editAutoExitTimer = setTimeout(() => {
+                    editAutoExitTimer = null;
+                    if (!isEditMode) return;
+                    if (isComposing || (Date.now() - lastEditActivityAt) < 180) {
+                        resetEditAutoExitTimer();
+                        return;
+                    }
+                    if (document.activeElement === editor) {
+                        editor.blur();
+                    } else {
+                        setEditMode(false);
+                    }
+                }, timeoutMs);
+            }
+
+            function setEditMode(active) {
+                if (isSpeechOwner()) {
+                    if (editAutoExitTimer) {
+                        clearTimeout(editAutoExitTimer);
+                        editAutoExitTimer = null;
+                    }
+                    isEditMode = false;
+                    return;
+                }
+                if (active) {
+                    isEditMode = true;
+                    markEditActivity();
+                    resetEditAutoExitTimer();
+                    return;
+                }
+                if (!isEditMode) return;
+                isEditMode = false;
+                if (editAutoExitTimer) {
+                    clearTimeout(editAutoExitTimer);
+                    editAutoExitTimer = null;
+                }
+                flushPendingServerText();
+                if (socket.connected) {
+                    socket.emit('join', { room: ROOM_ID, role: 'director' });
+                }
+            }
+
+            function scheduleFullStateResync(delayMs = 200) {
+                if (deferredResyncTimer) return;
+                deferredResyncTimer = setTimeout(() => {
+                    deferredResyncTimer = null;
+                    if (socket.connected) {
+                        socket.emit('join', { room: ROOM_ID, role: 'director' });
+                    }
+                }, delayMs);
+            }
+
+            function applyServerText(newText) {
+                const incoming = String(newText || '');
+                if (editor.value === incoming) {
+                    lastSentText = incoming;
+                    notifyMainTextUpdated();
+                    return;
+                }
+                const oldText = editor.value;
+                const oldCursorPos = editor.selectionStart || 0;
+                editor.value = incoming;
+                lastSentText = incoming;
+                if (document.activeElement === editor) {
+                    try {
+                        const diffs = dmp.diff_main(oldText, incoming);
+                        const newCursorPos = dmp.diff_xIndex(diffs, oldCursorPos);
+                        editor.selectionStart = editor.selectionEnd = Math.min(newCursorPos, editor.value.length);
+                    } catch (e) {
+                        editor.selectionStart = editor.selectionEnd = Math.min(oldCursorPos, editor.value.length);
+                    }
+                }
+                notifyMainTextUpdated();
+            }
+
+            function applyOrQueueServerText(newText) {
+                if (shouldDeferServerApply()) {
+                    pendingServerText = String(newText || '');
+                    return;
+                }
+                applyServerText(newText);
+            }
+
+            function flushPendingServerText() {
+                if (pendingServerText == null) return;
+                if (shouldDeferServerApply()) return;
+                const text = pendingServerText;
+                pendingServerText = null;
+                applyServerText(text);
+            }
+			
+            // === 新增：IME 沙箱核心輔助函式 ===
+
+            // 顯示並定位沙箱
+            function showSandbox() {
+                if (true) return;
+
+                // 1. 記錄當前游標位置作為插入點
+                sandboxAnchorPosition = editor.selectionStart;
+
+                // 2. 使用 textMetrics 計算游標的畫面座標
+                const coords = textMetrics.getCoords(sandboxAnchorPosition);
+                if (!coords) return;
+
+                // 3. 定位沙箱
+                //    - 將沙箱定位在游標所在行的正下方 (右下方)
+                imeSandbox.style.top = `${coords.top + coords.height - editor.scrollTop + 2}px`; // top + height 將其推到下一行，+2px 是微小的間距
+                imeSandbox.style.left = `${coords.left - editor.scrollLeft}px`;
+
+                // 4. 複製主編輯器的字體樣式
+                imeSandbox.style.fontSize = editor.style.fontSize;
+                imeSandbox.style.fontFamily = editor.style.fontFamily;
+                imeSandbox.style.lineHeight = editor.style.lineHeight;
+
+                // 5. 顯示沙箱並設定狀態
+                imeSandbox.style.display = 'block';
+                isSandboxActive = true;
+                imeSandbox.focus();
+            }
+
+            // 隱藏並重設沙箱
+            function hideSandbox(shouldFocusEditor = true) {
+                if (!isSandboxActive) return;
+
+                imeSandbox.textContent = '';
+                imeSandbox.style.display = 'none';
+                isSandboxActive = false;
+                
+                if (shouldFocusEditor) {
+                    editor.focus();
+                    // 恢復游標到插入點
+                    try {
+                        editor.selectionStart = editor.selectionEnd = sandboxAnchorPosition;
+                    } catch (e) {}
+                }
+                setTimeout(flushPendingServerText, 0);
+            }
+            
+            // 提交沙箱內容到主編輯器
+            function commitSandboxText() {
+                if (!isSandboxActive) return;
+
+                const textToInsert = imeSandbox.textContent;
+                hideSandbox(false); // 先隱藏，避免焦點問題
+
+                if (textToInsert) {
+                    const currentText = editor.value;
+                    const before = currentText.substring(0, sandboxAnchorPosition);
+                    const after = currentText.substring(sandboxAnchorPosition);
+                    
+                    editor.value = before + textToInsert + after;
+                    
+                    // 更新游標位置
+                    const newCursorPos = sandboxAnchorPosition + textToInsert.length;
+                    editor.selectionStart = editor.selectionEnd = newCursorPos;
+
+                    // 觸發 input 事件，讓協作系統知道文本已變更
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                editor.focus(); // 最後再將焦點移回主編輯器
+            }			
+
+            // --- Style Settings Logic (Refactored) ---
+			            // --- 最終版：基於 beforeinput 的防禦性沙箱觸發器 ---
+            editor.addEventListener('beforeinput', (e) => {
+                // IME sandbox is deprecated; keep native textarea editing behavior.
+                return;
+                const nonTriggerInputTypes = new Set([
+                    'deleteContentBackward', 'deleteContentForward', 'deleteByCut',
+                    'historyUndo', 'historyRedo'
+                ]);
+
+                // 規則 1：在以下情況，應「放行」預設輸入行為，不觸發沙箱：
+                // - 沙箱已經是啟動狀態
+                // - 輸入類型不是打字或貼上 (例如：刪除、復原)
+                // - 語音功能「沒有」被任何人佔用
+                // - 語音功能被「自己」佔用 (即自己是說話者)
+                const isSpeechFree = !localState.speech_user || localState.speech_user === socket.id;
+                if (isSandboxActive || isSpeechFree || nonTriggerInputTypes.has(e.inputType)) {
+                    return;
+                }
+
+                // 規則 2：對於所有其他輸入意圖 (協作者在他人語音中進行打字、貼上等)...
+                
+                // 【核心修正】在事件發生前，立刻記錄下編輯器的原始狀態
+                const originalText = editor.value;
+                const selectionStart = editor.selectionStart;
+                const selectionEnd = editor.selectionEnd;
+
+                // 阻止預設行為
+                e.preventDefault();
+
+                // 使用 setTimeout 將我們的操作推遲到瀏覽器內部處理之後
+                setTimeout(() => {
+                    // 【防禦性檢查】檢查是否有字元「洩漏」進了編輯器
+                    if (editor.value !== originalText) {
+                        // 如果有，強制將編輯器恢復到事件發生前的狀態
+                        editor.value = originalText;
+                        editor.setSelectionRange(selectionStart, selectionEnd);
+                    }
+
+                    // 現在，在一個絕對乾淨的狀態下，啟動沙箱
+                    if (!isSandboxActive) {
+                        showSandbox(); // 顯示沙箱並轉移焦點
+
+                        // 將被攔截的初始數據 (e.data) 填入沙箱，
+                        // 無論是單個字元還是貼上的文本，都能正確處理
+                        if (e.data) {
+                            // 使用 document.execCommand 來處理插入，這對 contenteditable 元素更穩定
+                            imeSandbox.focus(); // 確保焦點在沙箱上
+                            document.execCommand('insertText', false, e.data);
+                        }
+                    }
+                }, 0);
+            });
+
+            document.addEventListener('keydown', (e) => {
+			
+			    // 【注意】原有的沙箱觸發邏輯已移至 beforeinput 事件，
+                // 此處僅保留與沙箱「無關」的快捷鍵功能。
+
+                // 新增：在任何時候，只要焦點在編輯器上，按 Tab 鍵即可手動呼叫沙箱
+                if (e.key === 'Tab' && document.activeElement === editor) {
+                    // 阻止 Tab 鍵的預設行為 (切換焦點)
+                    e.preventDefault(); 
+                    // 呼叫沙箱
+                    return;
+                    // 結束事件處理，避免觸發後續的快捷鍵 (例如 Ctrl+H)
+                    return; 
+                }
+
+                // Esc to close modals
+                if (e.key === 'Escape') {
+                    let modalWasClosed = false;
+                    if (importModal.style.display !== 'none') {
+                        importModal.style.display = 'none';
+                        modalWasClosed = true;
+                    }
+                    if (replaceModal.style.display !== 'none') {
+                        replaceModal.style.display = 'none';
+                        modalWasClosed = true;
+                    }
+                    if (shareModal.style.display !== 'none') {
+                        shareModal.style.display = 'none';
+                        modalWasClosed = true;
+                    }
+                    if (modalWasClosed) {
+                        e.preventDefault();
+                        return; // Stop further key processing if a modal was closed
+                    }
+
+                    if (document.activeElement === editor && isEditMode) {
+                        e.preventDefault();
+                        editor.blur();
+                        return;
+                    }
+                }
+
+                const isCtrl = e.ctrlKey || e.metaKey;
+                if (!isCtrl) return;
+
+                // Ctrl+H to open Replace modal
+                if (e.key.toLowerCase() === 'h') {
+                    e.preventDefault();
+                    replaceWordsBtn.click();
+                    return;
+                }
+
+                const plusPressed = e.key === '=' || e.key === '+';
+                const minusPressed = e.key === '-' || e.key === '_';
+                if (!plusPressed && !minusPressed) return;
+                e.preventDefault();
+                const current = parseInt(directorFontSizeInput.value, 10) || 24;
+                const delta = plusPressed ? 2 : -2;
+                const next = Math.min(72, Math.max(8, current + delta));
+                directorFontSizeInput.value = next;
+                saveDirectorSettings();
+            });
+
+            function applyDirectorSettings() {
+                const settings = {
+                    fontFamily: directorFontFamilySelect.value,
+                    fontSize: `${directorFontSizeInput.value}px`,
+                    lineHeight: directorLineHeightInput.value,
+                    fontStyle: directorFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+                    fontWeight: directorFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+                    color: directorFontColorInput.value,
+                    backgroundColor: directorBgColorInput.value
+                };
+
+                editor.style.fontFamily = settings.fontFamily;
+                editor.style.fontSize = settings.fontSize;
+                editor.style.lineHeight = settings.lineHeight;
+                editor.style.fontStyle = settings.fontStyle;
+                editor.style.fontWeight = settings.fontWeight;
+                editor.style.color = settings.color;
+                editor.style.backgroundColor = settings.backgroundColor;
+                interimTail.style.fontFamily = settings.fontFamily;
+                interimTail.style.fontSize = settings.fontSize;
+                interimTail.style.lineHeight = settings.lineHeight;
+                interimTail.style.fontStyle = settings.fontStyle;
+                interimTail.style.fontWeight = settings.fontWeight;
+                syncInterimTailLayout();
+                 
+                // 當編輯器樣式改變後，手動同步一次測量工具的樣式
+                if (typeof textMetrics !== 'undefined' && typeof textMetrics.sync === 'function') {
+                    textMetrics.sync();
+                }
+
+                return settings;
+            }
+
+            function saveDirectorSettings() {
+                const idleSeconds = getEditIdleSeconds();
+                editorIdleSecondsInput.value = idleSeconds;
+                const settings = {
+                    fontFamily: directorFontFamilySelect.value,
+                    fontSize: `${directorFontSizeInput.value}px`,
+                    lineHeight: directorLineHeightInput.value,
+                    fontStyle: directorFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+                    fontWeight: directorFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+                    color: directorFontColorInput.value,
+                    backgroundColor: directorBgColorInput.value,
+                    speechBreakMode: directorSpeechBreakMode.value,
+                    editIdleSeconds: idleSeconds
+				};
+                localStorage.setItem('directorEditorSettings', JSON.stringify(settings));
+                try {
+                    socket.emit('update_director_settings', {
+                        room: ROOM_ID,
+                        settings: { ...settings, theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light' }
+                    });
+                } catch(e) {}
+            }
+            
+			function saveViewerSettings() {
+                const settings = {
+                    fontFamily: viewerFontFamilySelect.value,
+                    fontSize: `${viewerFontSizeInput.value}px`,
+                    lineHeight: viewerLineHeightInput.value,
+                    fontStyle: viewerFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+                    fontWeight: viewerFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+                    color: viewerFontColorInput.value,
+                    backgroundColor: viewerBgColorInput.value
+                };
+                localStorage.setItem('viewerEditorSettings', JSON.stringify(settings));
+                
+                const currentTheme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+                
+                try {
+                    socket.emit('update_viewer_settings', { 
+                        room: ROOM_ID, 
+                        settings: { ...settings, theme: currentTheme } 
+                    });
+                } catch(e) {}
+            }
+
+            function exportSettingsToJson() {
+                const settings = {
+                    director: JSON.parse(localStorage.getItem('directorEditorSettings') || '{}'),
+                    viewer: JSON.parse(localStorage.getItem('viewerEditorSettings') || '{}'),
+                    theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light'
+                };
+                const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'editor-settings.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            }
+            
+            function updateDirectorControls(settings) {
+                if (!settings) return;
+                directorFontFamilySelect.value = settings.fontFamily || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
+                directorFontSizeInput.value = parseInt(settings.fontSize, 10) || 24;
+                directorLineHeightInput.value = settings.lineHeight || 1.2;
+                if (settings.fontWeight === 'bold') {
+                    directorFontStyleSelect.value = 'bold';
+                } else if (settings.fontStyle === 'italic') {
+                    directorFontStyleSelect.value = 'italic';
+                } else {
+                    directorFontStyleSelect.value = 'normal';
+                }
+                directorFontColorInput.value = settings.color || '#000000';
+                directorBgColorInput.value = settings.backgroundColor || '#FFFFFF';
+				
+				directorSpeechBreakMode.value = settings.speechBreakMode || 'newline';
+                editorIdleSecondsInput.value = Math.min(60, Math.max(1, parseInt(settings.editIdleSeconds, 10) || 3));
+                applyDirectorSettings();
+                if (isEditMode) {
+                    resetEditAutoExitTimer();
+                }
+            }
+
+            function updateViewerControls(settings) {
+                if (!settings) return;
+                viewerFontFamilySelect.value = settings.fontFamily || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
+                viewerFontSizeInput.value = parseInt(settings.fontSize, 10) || 60;
+                viewerLineHeightInput.value = settings.lineHeight || 1.4;
+                if (settings.fontWeight === 'bold') {
+                    viewerFontStyleSelect.value = 'bold';
+                } else if (settings.fontStyle === 'italic') {
+                    viewerFontStyleSelect.value = 'italic';
+                } else {
+                    viewerFontStyleSelect.value = 'normal';
+                }
+                viewerFontColorInput.value = settings.color || '#FFFFFF';
+                viewerBgColorInput.value = settings.backgroundColor || '#000000';
+            }
+
+            function importSettingsFromJson(jsonText) {
+                try {
+                    const settingsBundle = JSON.parse(jsonText);
+                    if (settingsBundle.director) {
+                        updateDirectorControls(settingsBundle.director);
+                        saveDirectorSettings();
+                    }
+                    if (settingsBundle.viewer) {
+                        updateViewerControls(settingsBundle.viewer);
+                        saveViewerSettings();
+                    }
+                    if (settingsBundle.theme) {
+                        localStorage.setItem('editorTheme', settingsBundle.theme);
+                        applyTheme(settingsBundle.theme);
+                    }
+                } catch (e) {
+                    alert('設定檔格式有誤，請確認為有效的 JSON。');
+                }
+            }
+
+            function loadSettings() {
+                const savedDirectorSettings = localStorage.getItem('directorEditorSettings');
+                if (savedDirectorSettings) {
+                    updateDirectorControls(JSON.parse(savedDirectorSettings));
+                }
+                const savedViewerSettings = localStorage.getItem('viewerEditorSettings');
+                 if (savedViewerSettings) {
+                    updateViewerControls(JSON.parse(savedViewerSettings));
+                }
+                applyDirectorSettings();
+            }
+            
+            // --- Handler function to apply AND save director settings ---
+            function handleDirectorSettingsChange() {
+                applyDirectorSettings(); // 步驟 1: 立即將樣式應用到畫面上，提供即時反饋
+                saveDirectorSettings();  // 步驟 2: 保存設定並廣播給協作者
+            }
+
+            // Bind the new handler to all director controls
+            [directorFontFamilySelect, directorFontSizeInput, directorFontStyleSelect, directorFontColorInput, directorBgColorInput, directorLineHeightInput, directorSpeechBreakMode, editorIdleSecondsInput].forEach(el => {
+                // 使用 'input' 事件可以同時捕捉到數字輸入、顏色選擇和下拉選單的變更
+                el.addEventListener('input', handleDirectorSettingsChange);
+            });
+
+            // Viewer settings logic remains unchanged, as it doesn't need to apply locally.
+            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput].forEach(el => {
+                el.addEventListener('input', saveViewerSettings);
+            });
+
+            // --- Dark Mode Logic ---
+			function applyTheme(theme) {
+                if (theme === 'dark') {
+                    // --- 導播端 (index.html) ---
+                    document.body.classList.add('dark-mode');
+                    directorFontColorInput.value = '#e0e0e0'; // 編輯區：灰白字
+                    directorBgColorInput.value = '#2c2c2c';  // 編輯區：深灰底
+
+                    // --- 觀眾端 (viewer.html) ---
+                    // 【修復問題2】無條件重置為「夜間模式預設值」
+                    viewerFontColorInput.value = '#ffff00'; // 觀眾端：黃字
+                    viewerBgColorInput.value = '#000000';  // 觀眾端：黑底
+
+                } else { // 切換到白天模式
+                    // --- 導播端 (index.html) ---
+                    document.body.classList.remove('dark-mode');
+                    directorFontColorInput.value = '#000000'; // 編輯區：黑字
+                    directorBgColorInput.value = '#FFFFFF';  // 編輯區：白底
+
+                    // --- 觀眾端 (viewer.html) ---
+                    // 【修復問題1的連帶問題】無條件重置為「白天模式預設值」
+                    viewerFontColorInput.value = '#000000'; // 觀眾端：黑字
+                    viewerBgColorInput.value = '#FFFFFF';  // 觀眾端：白底
+                }
+
+                // 在設定完所有顏色值之後，一次性保存、廣播並應用
+                saveDirectorSettings(); // 保存並廣播導播端設定
+                saveViewerSettings();   // 保存並廣播【已重置】的觀眾端設定
+				
+                // 【修復問題1】將導播端的樣式實際應用到畫面上
+				applyDirectorSettings();
+            }
+
+            darkModeToggle.addEventListener('click', () => {
+                const isDarkMode = document.body.classList.contains('dark-mode');
+                const newTheme = isDarkMode ? 'light' : 'dark';
+                localStorage.setItem('editorTheme', newTheme);
+                applyTheme(newTheme);
+            });
+
+            // --- Pane Collapse Logic ---
+            const paneToggleBtn = document.getElementById('pane-toggle-btn');
+            const mainContainer = document.querySelector('.main-container');
+            const settingsPane = document.getElementById('settings-pane');
+
+            function updatePaneTogglePosition() {
+                if (mainContainer.classList.contains('settings-collapsed')) {
+                    paneToggleBtn.style.right = '0px';
+                    return;
+                }
+                const paneWidth = Math.round(settingsPane.getBoundingClientRect().width);
+                const safeWidth = Math.max(0, paneWidth);
+                paneToggleBtn.style.right = `${safeWidth}px`;
+            }
+
+            function updatePaneToggleAria() {
+                const isCollapsed = mainContainer.classList.contains('settings-collapsed');
+                paneToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+                paneToggleBtn.setAttribute('aria-label', isCollapsed ? '展開設定' : '收合設定');
+            }
+
+            function toggleSettingsPane() {
+                const isCollapsed = mainContainer.classList.toggle('settings-collapsed');
+                paneToggleBtn.innerHTML = isCollapsed ? '&laquo;' : '&raquo;';
+                updatePaneToggleAria();
+                updatePaneTogglePosition();
+                setTimeout(updatePaneTogglePosition, 320);
+            }
+
+            window.addEventListener('resize', updatePaneTogglePosition);
+            settingsPane.addEventListener('transitionend', updatePaneTogglePosition);
+            paneToggleBtn.addEventListener('click', toggleSettingsPane);
+            paneToggleBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleSettingsPane();
+                }
+            });
+
+            paneToggleBtn.innerHTML = mainContainer.classList.contains('settings-collapsed') ? '&laquo;' : '&raquo;';
+            updatePaneTogglePosition();
+            updatePaneToggleAria();
+
+            // --- Snippets Panel Logic (Left) ---
+            const snippetsPane = document.getElementById('snippets-pane');
+            const snippetsToggleBtn = document.getElementById('snippets-toggle-btn');
+            const snippetsClearBtn = document.getElementById('snippets-clear-btn');
+            const snippetTextareas = [
+                document.getElementById('snippet-1'),
+                document.getElementById('snippet-2'),
+                document.getElementById('snippet-3'),
+                document.getElementById('snippet-4'),
+                document.getElementById('snippet-5'),
+                document.getElementById('snippet-6'),
+                document.getElementById('snippet-7'),
+                document.getElementById('snippet-8'),
+                document.getElementById('snippet-9'),
+                document.getElementById('snippet-0'),
+            ];
+
+            function loadSnippets() {
+                try {
+                    const raw = localStorage.getItem('editorSnippets') || '{}';
+                    const data = JSON.parse(raw);
+                    snippetTextareas.forEach((ta, idx) => {
+                        const key = idx === 9 ? '0' : String(idx + 1);
+                        ta.value = data[key] || '';
+                    });
+                } catch (e) {}
+            }
+
+            function saveSnippets() {
+                try {
+                    const data = {};
+                    snippetTextareas.forEach((ta, idx) => {
+                        const key = idx === 9 ? '0' : String(idx + 1);
+                        data[key] = ta.value || '';
+                    });
+                    localStorage.setItem('editorSnippets', JSON.stringify(data));
+                } catch (e) {}
+            }
+
+            function updateSnippetsTogglePosition() {
+                if (mainContainer.classList.contains('snippets-collapsed')) {
+                    snippetsToggleBtn.style.left = '0px';
+                    return;
+                }
+                const width = Math.round(snippetsPane.getBoundingClientRect().width);
+                snippetsToggleBtn.style.left = `${Math.max(0, width)}px`;
+            }
+
+            function updateSnippetsToggleAria() {
+                const isCollapsed = mainContainer.classList.contains('snippets-collapsed');
+                snippetsToggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+                snippetsToggleBtn.setAttribute('aria-label', isCollapsed ? '展開片段' : '收合片段');
+            }
+
+            function toggleSnippetsPane() {
+                const isCollapsed = mainContainer.classList.toggle('snippets-collapsed');
+                snippetsToggleBtn.innerHTML = isCollapsed ? '&raquo;' : '&laquo;';
+                updateSnippetsToggleAria();
+                updateSnippetsTogglePosition();
+                setTimeout(updateSnippetsTogglePosition, 320);
+            }
+
+            window.addEventListener('resize', updateSnippetsTogglePosition);
+            snippetsPane.addEventListener('transitionend', updateSnippetsTogglePosition);
+            snippetsToggleBtn.addEventListener('click', toggleSnippetsPane);
+            snippetsToggleBtn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSnippetsPane(); }
+            });
+
+            const snippetsSaveBtn = document.getElementById('snippets-save-btn');
+            const snippetsLoadBtn = document.getElementById('snippets-load-btn');
+            const snippetsFileInput = document.getElementById('snippets-file-input');
+
+            snippetTextareas.forEach(ta => ta.addEventListener('input', saveSnippets));
+            if (snippetsClearBtn) {
+                snippetsClearBtn.addEventListener('click', () => {
+                    if (!window.confirm('確定清空所有片段嗎？')) return;
+                    snippetTextareas.forEach(ta => ta.value = '');
+                    saveSnippets();
+                });
+            }
+
+            if (snippetsSaveBtn) {
+                snippetsSaveBtn.addEventListener('click', () => {
+                    const snippetsJson = localStorage.getItem('editorSnippets') || '{}';
+                    const blob = new Blob([snippetsJson], { type: 'application/json' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'snippets.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                });
+            }
+
+            if (snippetsLoadBtn) {
+                snippetsLoadBtn.addEventListener('click', () => snippetsFileInput.click());
+            }
+
+            if (snippetsFileInput) {
+                snippetsFileInput.addEventListener('change', (e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        try {
+                            const jsonText = String(ev.target?.result || '{}');
+                            // 驗證一下是否為合法的JSON
+                            JSON.parse(jsonText); 
+                            // 直接寫入 localStorage 並呼叫現有的載入函式，最簡單
+                            localStorage.setItem('editorSnippets', jsonText);
+                            loadSnippets();
+                        } catch (err) {
+                            alert('載入失敗，請確認檔案格式為正確的 JSON。');
+                        }
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                    e.target.value = ''; // 重設檔案輸入框，以便可以再次上傳同一個檔案
+                });
+            }
+            document.querySelectorAll('.snippet-insert-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.getAttribute('data-snippet');
+                    const ta = document.getElementById(`snippet-${id}`);
+                    const text = ta ? ta.value : '';
+                    if (!text) return;
+                    editor.focus();
+                    insertAtCursor(editor, text);
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
+
+            function getSnippetTextByDigit(digit) {
+                const id = digit === '0' ? '0' : digit;
+                const ta = document.getElementById(`snippet-${id}`);
+                return ta ? (ta.value || '') : '';
+            }
+
+            function handleSnippetHotkeys(e) {
+                const isCtrl = e.ctrlKey || e.metaKey;
+                if (!isCtrl) return;
+                const key = e.key;
+                if (!/^[0-9]$/.test(key)) return;
+                const active = document.activeElement;
+                if (active !== editor) return;
+                e.preventDefault();
+                try { e.stopPropagation(); e.stopImmediatePropagation(); } catch(_) {}
+                const text = getSnippetTextByDigit(key);
+                if (text) {
+                    insertAtCursor(editor, text);
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+            document.addEventListener('keydown', handleSnippetHotkeys, true);
+
+            loadSnippets();
+            snippetsToggleBtn.innerHTML = mainContainer.classList.contains('snippets-collapsed') ? '&raquo;' : '&laquo;';
+            updateSnippetsTogglePosition();
+            updateSnippetsToggleAria();
+
+            // --- Core Application Logic ---
+            function updateStatusDisplay() {
+                if (socket.connected) {
+                    let statusText = `已連線 ✅ (${latency}ms)`;
+                    if (connectionCounts) {
+                        const directors = Number(connectionCounts.directors || 0);
+                        const viewers = Number(connectionCounts.viewers || 0);
+                        const total = Number(connectionCounts.total ?? (directors + viewers));
+                        statusText += ` / 在線: ${total}人（導播:${directors} 觀眾:${viewers}）`;
+                    }
+                    statusDiv.textContent = statusText;
+                } else {
+                    statusDiv.textContent = '連線中斷 ❌';
+                }
+            }
+
+            function updateSpeechLockUI(speechUser) {
+                const isLocked = speechUser && speechUser !== socket.id;
+                
+                
+
+                speechToggleBtn.disabled = isLocked;
+                directorSpeechBreakMode.disabled = isLocked;
+
+                if (isLocked) {
+                    speechToggleBtn.textContent = '語音轉錄佔用';
+                    speechToggleBtn.classList.add('recording'); 
+                } else {
+                    if (!isRecording) {
+                        speechToggleBtn.textContent = '開始語音識別';
+                        speechToggleBtn.classList.remove('recording');
+                    }
+                }
+            }
+
+            socket.on('connect', () => {
+                statusDiv.textContent = '已連線 ✅';
+                socket.emit('join', { room: ROOM_ID, role: 'director' });
+                
+                loadSettings();
+                const savedTheme = localStorage.getItem('editorTheme') || 'light';
+                applyTheme(savedTheme);
+                saveDirectorSettings();
+                saveViewerSettings();
+            });
+
+            socket.on('disconnect', () => {
+                statusDiv.textContent = '連線中斷 ❌';
+                connectionCounts = null;
+            });
+
+            socket.on('speech_state_update', (data) => {
+                if (localState) {
+                    localState.speech_user = data.speech_user;
+                }
+                updateSpeechLockUI(data.speech_user);
+            });
+
+            socket.on('state_update', wrapUpdateFunction((newState) => {
+                localState = newState;
+                if (!newState) return;
+                if (newState) {
+                    if (newState.viewer_id) {
+                        try { localStorage.setItem('viewerId_' + ROOM_ID, newState.viewer_id); } catch(_) {}
+                    }
+                    updateDirectorControls(newState.director_settings);
+                    updateViewerControls(newState.viewer_settings);
+                    applyTheme(newState.director_settings?.theme || 'light');
+                    updateSpeechLockUI(newState.speech_user);
+                    setInterimTailText(newState.interim_text || '');
+                }
+
+                applyOrQueueServerText(newState.raw_text);
+            }));
+
+            socket.on('director_settings_update', (data) => {
+                if (data && data.settings) {
+                    updateDirectorControls(data.settings);
+                    applyDirectorSettings();
+                    localStorage.setItem('directorEditorSettings', JSON.stringify(data.settings));
+                }
+            });
+             
+            socket.on('viewer_settings_update', (data) => {
+                if (data && data.settings) {
+                    updateViewerControls(data.settings);
+                    localStorage.setItem('viewerEditorSettings', JSON.stringify(data.settings));
+                }
+            });
+
+            socket.on('interim_update', (payload) => {
+                setInterimTailText(payload?.text || '');
+                flushPendingServerText();
+            });
+
+            setInterval(() => {
+                try { socket.emit('ping', { timestamp: Date.now() }); } catch(e) {}
+            }, 5000);
+
+            socket.on('pong', (data) => {
+                latency = Date.now() - data.timestamp;
+                updateStatusDisplay();
+            });
+
+            socket.on('connection_update', (counts) => {
+                connectionCounts = counts;
+                updateStatusDisplay();
+            });
+
+			socket.on('script_patched', wrapUpdateFunction((data) => {
+                const patch_text = data.patch;
+                const oldText = editor.value;
+                if (shouldDeferServerApply()) {
+                    scheduleFullStateResync(250);
+                    return;
+                }
+                try {
+                    const patches = dmp.patch_fromText(patch_text);
+                    const [newText, results] = dmp.patch_apply(patches, oldText);
+                    if (results.some(res => !res)) {
+                        socket.emit('join', { room: ROOM_ID, role: 'director' });
+                        return;
+                    }
+                    applyOrQueueServerText(newText);
+
+                    // === 新增：同步更新 IME 沙箱的錨點位置 ===
+                    if (isSandboxActive) {
+                        const diffs = dmp.diff_main(oldText, newText);
+                        const newAnchorPos = dmp.diff_xIndex(diffs, sandboxAnchorPosition);
+                        sandboxAnchorPosition = newAnchorPos;
+                        
+                        // 重新定位沙箱的顯示位置
+                        const coords = textMetrics.getCoords(sandboxAnchorPosition);
+                        if (coords) {
+                            imeSandbox.style.top = `${coords.top - editor.scrollTop + 4}px`;
+                            imeSandbox.style.left = `${coords.left - editor.scrollLeft}px`;
+                        }
+                    }
+
+                } catch (error) {
+                    socket.emit('join', { room: ROOM_ID, role: 'director' });
+                }
+            }));
+
+
+				editor.addEventListener('input', () => {
+                    markEditActivity();
+                    if (isEditMode) resetEditAutoExitTimer();
+					clearTimeout(patchUpdateTimeout);
+					patchUpdateTimeout = setTimeout(() => {
+					// 組字保護改由外層的 defer 機制處理，這裡只負責送出 patch。
+					const currentText = editor.value;
+					if (currentText !== lastSentText) {
+						const patch_text = dmp.patch_toText(dmp.patch_make(lastSentText, currentText));
+						if (patch_text) {
+							socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
+						}
+						lastSentText = currentText;
+					}
+				}, 80);
+			});
+
+	            editor.addEventListener('compositionstart', () => {
+	                isComposing = true;
+                    markEditActivity();
+	                if (isEditMode) resetEditAutoExitTimer();
+	            });
+
+                editor.addEventListener('compositionupdate', () => {
+                    markEditActivity();
+                    if (isEditMode) resetEditAutoExitTimer();
+                });
+
+	            editor.addEventListener('compositionend', () => {
+	                isComposing = false;
+                    markEditActivity();
+	                flushPendingServerText();
+	                if (isEditMode) resetEditAutoExitTimer();
+	            });
+
+	            editor.addEventListener('focus', () => {
+                    markEditActivity();
+	                setEditMode(true);
+	            });
+
+            editor.addEventListener('blur', () => {
+                setEditMode(false);
+            });
+
+	            ['keydown', 'click', 'mouseup', 'select'].forEach((ev) => {
+	                editor.addEventListener(ev, () => {
+                        markEditActivity();
+	                    if (isEditMode) resetEditAutoExitTimer();
+	                });
+	            });
+			
+            // === 新增：IME 沙箱的事件監聽 ===
+            imeSandbox.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // 阻止 contenteditable 預設的換行行為
+                    commitSandboxText();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    hideSandbox();
+                }
+            });
+
+            // 當沙箱失去焦點時 (例如使用者點擊了頁面其他地方)，就取消輸入
+            imeSandbox.addEventListener('blur', () => {
+                // 用一個微小的延遲來處理，避免與 Enter 提交的焦點切換衝突
+                setTimeout(() => {
+                    if (document.activeElement !== imeSandbox) {
+                       hideSandbox();
+                    }
+                }, 100);
+            });			
+
+            // --- Button Event Listeners ---
+            editor.addEventListener('scroll', handleEditorScroll);
+            scrollToBottomBtn.addEventListener('click', () => {
+                shouldAutoScrollEditor = true;
+                scrollToBottom(editor);
+                handleEditorScroll();
+            });
+            handleEditorScroll();
+
+            // 定期偵測並強制滾動置底
+            setInterval(() => {
+                if (shouldAutoScrollEditor) {
+                    scrollToBottom(editor);
+                }
+            }, 1500);
+
+			shareViewerBtn.addEventListener('click', async () => {
+                const viewerUrl = `${location.origin}/view/${localStorage.getItem('viewerId_' + ROOM_ID) || ''}`;
+                shareLinkAnchor.href = viewerUrl;
+                shareLinkAnchor.textContent = viewerUrl;
+                try { shareQrCodeContainer.innerHTML = ''; } catch(_) {}
+                try {
+                    new QRCode(shareQrCodeContainer, {
+                        text: viewerUrl,
+                        width: 180,
+                        height: 180,
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                } catch (e) {}
+                shareModal.style.display = 'flex';
+            });
+
+            settingsSaveBtn.addEventListener('click', exportSettingsToJson);
+
+			shareCopyBtn.addEventListener('click', async () => {
+                const url = shareLinkAnchor.href || '';
+                if (!url || url.endsWith('#')) return;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    alert('已複製連結');
+                } catch (e) {
+                    prompt('請手動複製觀眾連結：', url);
+                }
+            });
+            shareCloseBtn.addEventListener('click', () => { shareModal.style.display = 'none'; });
+            shareModal.addEventListener('click', (ev) => {
+                if (ev.target === shareModal) shareModal.style.display = 'none';
+            });
+
+            // Add click-outside-to-close for other modals
+            replaceModal.addEventListener('click', (ev) => {
+                if (ev.target === replaceModal) replaceModal.style.display = 'none';
+            });
+            importModal.addEventListener('click', (ev) => {
+                if (ev.target === importModal) importModal.style.display = 'none';
+            });
+
+            settingsLoadBtn.addEventListener('click', () => settingsFileInput.click());
+            settingsFileInput.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    importSettingsFromJson(String(ev.target?.result || ''));
+                };
+                reader.readAsText(file, 'UTF-8');
+                e.target.value = '';
+            });
+
+             clearBtn.addEventListener('click', () => {
+                if (window.confirm('您確定要清空所有文本嗎？此操作無法復原。')) {
+                    wrapUpdateFunction(() => {
+                        editor.value = '';
+                        editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    })();
+                }
+            });
+
+            importBtn.addEventListener('click', () => { fileInput.click(); });
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => { 
+                    importedFileContent = e.target.result;
+                    importModal.style.display = 'flex';
+                };
+                reader.readAsText(file, 'UTF-8');
+                event.target.value = '';
+            });
+            
+            exportBtn.addEventListener('click', () => {
+                const textToSave = editor.value;
+                const blob = new Blob([textToSave], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'script.txt';
+                document.body.appendChild(a); 
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            });
+
+            const wrappedUpdateEditorAndSend = wrapUpdateFunction((newText) => {
+                editor.value = newText;
+                socket.emit('update_script', { room: ROOM_ID, raw_text: newText });
+                lastSentText = newText;
+            });
+
+            importRawBtn.addEventListener('click', () => {
+                wrappedUpdateEditorAndSend(importedFileContent);
+                importModal.style.display = 'none';
+            });
+
+            importSmartBtn.addEventListener('click', () => {
+                const processedText = smartLoad(importedFileContent);
+                wrappedUpdateEditorAndSend(processedText);
+                importModal.style.display = 'none';
+            });
+
+            importCancelBtn.addEventListener('click', () => { 
+                importModal.style.display = 'none';
+            });
+
+            replaceWordsBtn.addEventListener('click', () => { 
+                replaceModal.style.display = 'flex';
+                findInput.value = '';
+                replaceInput.value = '';
+                findInput.focus();
+            });
+
+            replaceCancelBtn.addEventListener('click', () => { 
+                replaceModal.style.display = 'none';
+            });
+
+            replaceAllBtn.addEventListener('click', () => { 
+                const findText = findInput.value;
+                const replaceText = replaceInput.value;
+                if (!findText) {
+                    alert('請輸入要尋找的詞彙。');
+                    return;
+                }
+                const confirmation = window.confirm(`您確定要將所有的 "${findText}" 置換為 "${replaceText}" 嗎？`);
+                if (confirmation) {
+                    const originalText = editor.value;
+                    const newText = originalText.split(findText).join(replaceText);
+                    if (originalText !== newText) {
+                        wrappedUpdateEditorAndSend(newText);
+                    }
+                    replaceModal.style.display = 'none';
+                }
+            });
+
+            leaveRoomBtn.addEventListener('click', () => {
+                if (window.confirm("您確定要離開這個房間嗎？")) {
+                    if (socket && socket.connected) socket.disconnect();
+                    document.documentElement.innerHTML = `
+                        <head><meta charset="UTF-8"><title>已離開</title><style>body{background-color:#2c3e50;color:#ecf0f1;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;}h1{font-size:4rem;font-weight:300;}</style></head>
+                        <body><h1>已離開房間</h1></body>
+                    `;
+                }
+            });
+
+            function smartLoad(text) {
+                const lines = text.split('\n');
+                const newLines = [];
+                const MAX_LEN = 20;
+                const punctuation = /([，、；。！？…])/; 
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine === '') continue;
+                    let currentLine = trimmedLine;
+                    while (currentLine.length > MAX_LEN) {
+                        let splitPos = -1;
+                        for (let i = MAX_LEN; i >= 0; i--) {
+                            if (i < currentLine.length && punctuation.test(currentLine[i])) {
+                                splitPos = i;
+                                break;
+                            }
+                        }
+                        if (splitPos !== -1) {
+                            newLines.push(currentLine.substring(0, splitPos + 1).trim());
+                            currentLine = currentLine.substring(splitPos + 1).trim();
+                        } else {
+                            break;
+                        }
+                    }
+                    if (currentLine.length > 0) newLines.push(currentLine);
+                }
+                return newLines.join('\n');
+            }
+
+            // === Speech Recognition (REWRITTEN) ===
+            function showSpeechStatus(message, type = 'info') {
+                try { console.debug('[Speech]', type, message || ''); } catch(e) {}
+            }
+            
+            // Speech Recognition State
+            let recognition = null;
+            let isRecording = false;
+            let userRequestedStop = false;
+            let hasClearedSpeechHint = false;
+            
+            // NEW: 語音辨識策略管理
+            let recognitionStrategy = 'auto'; // 'auto' (Edge模式) 或 'manual' (Chrome模式)
+            let strategyHasBeenSet = false; // 是否已決定策略
+            let lastFinalTranscript = ''; // for 'manual' strategy
+            let sentenceBuffer = ''; // for 'manual' strategy
+            let sentenceFinalizeTimeout = null; // for 'manual' strategy
+			// NEW: Proactive Restart state for Chrome
+			let proactiveRestartTimer = null; 
+			let isProactivelyRestarting = false;
+
+            const RESTART_BACKOFF_INITIAL_MS = 200;
+            const RESTART_BACKOFF_MAX_MS = 2000;
+            let restartBackoffMs = RESTART_BACKOFF_INITIAL_MS;
+
+            // Anchor/Cursor management variables
+            let speechAnchor = null;
+            let provisionalBuffer = '';
+            let anchorInitialSelLen = 0;
+            let lastCursorStart = null, lastCursorEnd = null;
+            let pendingAnchorStart = null, pendingAnchorSelLen = 0;
+
+            function insertAtCursor(textarea, text) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const before = textarea.value.substring(0, start);
+                const after = textarea.value.substring(end);
+                textarea.value = before + text + after;
+                textarea.selectionStart = textarea.selectionEnd = start + text.length;
+            }
+
+            // NEW: 策略偵測函式
+            function detectRecognitionStrategy(transcript) {
+                // 檢查是否包含中文或英文的標点符號
+                const hasPunctuation = /[.,?!;，。？！；]/.test(transcript);
+                if (hasPunctuation) {
+                    return 'auto'; // Edge模式
+                }
+                return 'manual'; // Chrome模式
+            }
+
+            function requestSpeechStartLock() {
+                return new Promise((resolve) => {
+                    socket.emit('request_speech_start', { room: ROOM_ID }, (ack) => resolve(ack || {}));
+                });
+            }
+
+            function requestSpeechStopLock() {
+                return new Promise((resolve) => {
+                    socket.emit('request_speech_stop', { room: ROOM_ID }, (ack) => resolve(ack || {}));
+                });
+            }
+
+            function pushInterimText(text, shouldBroadcast = false) {
+                setInterimTailText(text);
+                if (shouldBroadcast) {
+                    try { socket.emit('interim_text', { room: ROOM_ID, text: String(text || '') }); } catch (e) {}
+                }
+            }
+
+            const appendCommittedText = wrapUpdateFunction((addedText, addSeparator = true) => {
+                const rawChunk = String(addedText || '');
+                if (!rawChunk.trim()) {
+                    pushInterimText('', true);
+                    return;
+                }
+                const chunk = rawChunk.replace(/\n+$/, '');
+
+                let separator = '';
+                if (addSeparator) {
+                    const breakMode = directorSpeechBreakMode.value;
+                    if (breakMode === 'newline') separator = '\n';
+                    if (breakMode === 'double-newline') separator = '\n\n';
+                }
+
+                const nextText = `${editor.value}${chunk}${separator}`;
+                editor.value = nextText;
+                try {
+                    editor.selectionStart = editor.selectionEnd = nextText.length;
+                } catch (e) {}
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+                pushInterimText('', true);
+                if (isSpeechOwner()) {
+                    notifyMainTextUpdated();
+                }
+            });
+
+            function initializeSpeechRecognition() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    showSpeechStatus('您的瀏覽器不支援語音識別功能。', 'error');
+                    speechToggleBtn.disabled = true;
+                    return;
+                }
+
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+
+                let guardTail = ''; // Specific to 'auto' mode, but we keep it scoped here
+                let awaitingFirstAfterRestart = false;
+                
+                function updateLastCursor() {
+                    try { 
+                        lastCursorStart = editor.selectionStart; 
+                        lastCursorEnd = editor.selectionEnd; 
+                    } catch(e) {}
+                }
+
+                function setSpeechAnchorIfUnset() {
+                    if (speechAnchor == null) {
+                        const len = editor.value.length;
+                        let start, end;
+                        if (pendingAnchorStart != null) {
+                            start = Math.max(0, Math.min(pendingAnchorStart, len));
+                            end = Math.max(start, Math.min(start + pendingAnchorSelLen, len));
+                            pendingAnchorStart = null; 
+                            pendingAnchorSelLen = 0;
+                        } else {
+                            start = (lastCursorStart != null) ? lastCursorStart : len;
+                            end = (lastCursorEnd != null) ? lastCursorEnd : start;
+                        }
+                        speechAnchor = Math.max(0, Math.min(start, len));
+                        anchorInitialSelLen = Math.max(0, Math.min(end - start, len - speechAnchor));
+                    }
+                }
+                
+                const provisionalWrite = (interim) => {
+                    pushInterimText(interim, true);
+                };
+
+				const finalizeCommit = (addedText, addSeparator = true) => {
+                    appendCommittedText(addedText, addSeparator);
+                    provisionalBuffer = '';
+                    anchorInitialSelLen = 0;
+                };
+
+                function mergeWithGuardTail(tail, incoming) {
+                    const t = String(tail || ''), s = String(incoming || '');
+                    if (!t) return s; if (!s) return t;
+                    const maxOverlap = Math.min(t.length, s.length);
+                    for (let k = maxOverlap; k >= 3; k--) {
+                        if (t.slice(-k) === s.slice(0, k)) {
+                            awaitingFirstAfterRestart = false;
+                            return t + s.slice(k);
+                        }
+                    }
+                    awaitingFirstAfterRestart = false;
+                    return t + s;
+                }
+				
+				// NEW: Proactive restart function for 'manual' (Chrome) mode
+				function proactiveRestart() {
+					if (!isRecording || userRequestedStop) return;
+					console.log("Proactively restarting speech recognition to maintain connection...");
+					isProactivelyRestarting = true;
+					try {
+						recognition.stop();
+					} catch(e) {
+						// If stop fails, reset flag and log error
+						console.error("Error calling stop() for proactive restart:", e);
+						isProactivelyRestarting = false;
+					}
+				}
+
+                ['keyup','click','select','mouseup','input','focus','blur'].forEach(ev => 
+                    editor.addEventListener(ev, updateLastCursor)
+                );
+                
+                recognition.onstart = () => {
+                    isRecording = true;
+                    restartBackoffMs = RESTART_BACKOFF_INITIAL_MS;
+                    try { setSpeechAnchorIfUnset(); } catch(e) {}
+                    speechToggleBtn.textContent = '停止語音識別';
+                    speechToggleBtn.classList.add('recording');
+                    showSpeechStatus('正在聆聽...', 'info');
+                };
+
+				recognition.onend = () => {
+					clearTimeout(sentenceFinalizeTimeout); // Always clear timers on end
+
+					// If this was a planned proactive restart, start immediately.
+					if (isProactivelyRestarting) {
+						isProactivelyRestarting = false; // Reset the flag
+						if (!userRequestedStop) {
+							try {
+								recognition.start();
+							} catch(e) { console.error("Error on proactive restart:", e); }
+						}
+						return; 
+					}
+
+					// If the recognition ends naturally (e.g., long pause) AND there's content, finalize it.
+					if (recognitionStrategy === 'manual' && sentenceBuffer) {
+						const punctuation = speechLangSelect.value.startsWith('zh') ? '。' : '.';
+						finalizeCommit(sentenceBuffer + punctuation, true);
+						sentenceBuffer = '';
+						lastFinalTranscript = '';
+					}
+
+					if (userRequestedStop) {
+						isRecording = false;
+						speechToggleBtn.textContent = '開始語音識別';
+						speechToggleBtn.classList.remove('recording');
+                        setInterimTailText('');
+						showSpeechStatus('識別已停止。', 'info');
+						return;
+					}
+					
+					// This part now only runs on truly unexpected stops.
+					showSpeechStatus('識別串流意外中斷，嘗試重啟…', 'warn');
+					setTimeout(() => {
+						if (!userRequestedStop) try { recognition.start(); } catch(e) {}
+					}, restartBackoffMs);
+					restartBackoffMs = Math.min(RESTART_BACKOFF_MAX_MS, restartBackoffMs * 2);
+				};
+
+                recognition.onerror = (event) => {
+                    let msg = `發生識別錯誤: ${event.error}`;
+                    if (event.error === 'no-speech') msg = '未偵測到語音。';
+                    if (event.error === 'audio-capture') msg = '麥克風無法使用。';
+                    if (event.error === 'not-allowed') msg = '已拒絕麥克風權限。';
+                    showSpeechStatus(msg, 'error');
+                    if (userRequestedStop) return;
+                    if (event.error === 'audio-capture' || event.error === 'not-allowed') {
+                        userRequestedStop = true;
+                        requestSpeechStopLock().catch(() => {});
+                        return;
+                    }
+
+                    setTimeout(() => { try { recognition.start(); } catch(e) {} }, Math.min(restartBackoffMs, RESTART_BACKOFF_MAX_MS));
+                    restartBackoffMs = Math.min(RESTART_BACKOFF_MAX_MS, restartBackoffMs * 2);
+                };
+
+				recognition.onresult = (event) => {
+					// Any result cancels the pending finalization/restart timer.
+					clearTimeout(sentenceFinalizeTimeout);
+
+					let interimTranscript = '';
+					let finalTranscript = '';
+					for (let i = event.resultIndex; i < event.results.length; ++i) {
+						if (event.results[i].isFinal) {
+							finalTranscript += event.results[i][0].transcript;
+						} else {
+							interimTranscript += event.results[i][0].transcript;
+						}
+					}
+
+					if (interimTranscript) {
+						const displayInterim = (recognitionStrategy === 'manual') ? sentenceBuffer + interimTranscript : interimTranscript;
+						provisionalWrite(displayInterim);
+					}
+					
+					if (finalTranscript) {
+						if (!strategyHasBeenSet) {
+							recognitionStrategy = detectRecognitionStrategy(finalTranscript);
+							strategyHasBeenSet = true;
+							console.log(`Speech recognition strategy set to: ${recognitionStrategy}`);
+						}
+
+						if (recognitionStrategy === 'auto') {
+							let toInsert = finalTranscript;
+							if (awaitingFirstAfterRestart && guardTail) {
+								toInsert = mergeWithGuardTail(guardTail, finalTranscript);
+							}
+							finalizeCommit(toInsert, true);
+							showSpeechStatus(`已插入: "${toInsert}"`, 'success');
+						
+						} else { // 'manual' strategy
+							if (finalTranscript.startsWith(lastFinalTranscript)) {
+								const newText = finalTranscript.slice(lastFinalTranscript.length);
+								sentenceBuffer += newText;
+							} else {
+								sentenceBuffer = finalTranscript;
+							}
+							lastFinalTranscript = finalTranscript;
+
+							provisionalWrite(sentenceBuffer);
+							showSpeechStatus(`辨識中: ${sentenceBuffer}`, 'info');
+
+							// NEW SMARTER TIMER LOGIC:
+							// This single timer now handles both punctuation and proactive restart.
+							// We wait for a natural pause (800ms). If it happens, we finalize the sentence
+							// AND immediately trigger a proactive restart to be ready for the next one.
+							sentenceFinalizeTimeout = setTimeout(() => {
+								if (sentenceBuffer) {
+									console.log("Pause detected. Finalizing and restarting...");
+									const punctuation = speechLangSelect.value.startsWith('zh') ? '。' : '.';
+									finalizeCommit(sentenceBuffer + punctuation, true);
+									sentenceBuffer = '';
+									lastFinalTranscript = '';
+									
+									// After finalizing, trigger the restart immediately.
+									proactiveRestart(); 
+								}
+							}, 800); // A more stable 800ms threshold
+						}
+					}
+				};
+            }
+
+			async function startSpeechRecognition() {
+				if (!recognition) return;
+
+                const startAck = await requestSpeechStartLock();
+                if (!startAck.granted) {
+                    if (localState) {
+                        localState.speech_user = startAck.speech_user || localState.speech_user || null;
+                    }
+                    alert('語音轉錄功能目前由其他協作者使用中。');
+                    return;
+                }
+                if (localState) {
+                    localState.speech_user = startAck.speech_user || socket.id;
+                }
+                updateSpeechLockUI(localState?.speech_user || socket.id);
+                if (!hasClearedSpeechHint) {
+                    editor.removeAttribute('placeholder');
+                    hasClearedSpeechHint = true;
+                }
+                
+                const storageKey = 'speechCleared_' + ROOM_ID;
+                if (!sessionStorage.getItem(storageKey)) {
+                    // 利用 sessionStorage 保證整個連線期間 (含重新載入)，只有第一次會清空
+                    wrappedUpdateEditorAndSend('');
+                    sessionStorage.setItem(storageKey, 'true');
+                }
+                setInterimTailText('');
+
+				userRequestedStop = false;
+
+				// MODIFIED: Reset all state variables for a clean start
+				isProactivelyRestarting = false; 
+				strategyHasBeenSet = false;
+				lastFinalTranscript = '';
+				sentenceBuffer = '';
+				clearTimeout(sentenceFinalizeTimeout);
+				
+				
+				speechAnchor = null;
+				provisionalBuffer = '';
+				anchorInitialSelLen = 0;
+
+				try {
+					updateLastCursor();
+					// ... (the rest of the cursor logic is unchanged)
+					const len = editor.value.length;
+					let start, end;
+					if (pendingAnchorStart !== null) {
+						start = Math.max(0, Math.min(pendingAnchorStart, len));
+						end = Math.max(start, Math.min(start + pendingAnchorSelLen, len));
+					} else {
+						const rawStart = (typeof editor.selectionStart === 'number') ? editor.selectionStart : len;
+						const rawEnd = (typeof editor.selectionEnd === 'number') ? editor.selectionEnd : rawStart;
+						start = Math.max(0, Math.min(rawStart, len));
+						end = Math.max(start, Math.min(rawEnd, len));
+					}
+					speechAnchor = start;
+					anchorInitialSelLen = end - start;
+					pendingAnchorStart = null;
+					pendingAnchorSelLen = 0;
+				} catch(e) {
+					console.error('Setting speech anchor failed:', e);
+				}	
+				
+				try {
+					recognition.lang = speechLangSelect.value;
+					recognition.start();
+				} catch (e) {
+					console.error("Speech recognition start error:", e);
+					showSpeechStatus('啟動識別失敗，可能已在執行中。', 'error');
+                    try { await requestSpeechStopLock(); } catch (_) {}
+				}
+			}
+
+			async function stopSpeechRecognition() {
+				if (!recognition) return;
+                if (!isRecording && localState?.speech_user !== socket.id) return;
+
+                const stopAck = await requestSpeechStopLock();
+                if (!stopAck.stopped) {
+                    updateSpeechLockUI(stopAck.speech_user || (localState && localState.speech_user));
+                    return;
+                }
+                if (localState) {
+                    localState.speech_user = stopAck.speech_user || null;
+                }
+                updateSpeechLockUI(localState?.speech_user || null);
+				userRequestedStop = true;
+				
+				// MODIFIED: Clear all timers on manual stop
+				
+				clearTimeout(sentenceFinalizeTimeout);
+
+				try {
+					let textToFinalize = latestInterimText;
+					if (recognitionStrategy === 'manual' && sentenceBuffer) {
+						textToFinalize = sentenceBuffer;
+					}
+					
+					if (textToFinalize) {
+					   finalizeCommit(textToFinalize, false); // Finalize without adding punctuation
+					}
+				} catch(e) {}
+
+				try {
+					recognition.stop();
+				} catch(e) {
+					console.error("Error on stop():", e);
+					// Manually update UI if stop() fails
+					isRecording = false;
+					speechToggleBtn.textContent = '開始語音識別';
+					speechToggleBtn.classList.remove('recording');
+				}
+				
+				try {
+					updateLastCursor();
+					// This part is already correct in your file
+					pendingAnchorStart = editor.selectionStart;
+					pendingAnchorSelLen = editor.selectionEnd - editor.selectionStart;
+				} catch (e) {
+					pendingAnchorStart = null;
+					pendingAnchorSelLen = 0;
+				}
+				
+				// Reset buffers, but not anchor position
+				provisionalBuffer = '';
+				sentenceBuffer = '';
+				lastFinalTranscript = '';
+			}
+
+            speechToggleBtn.addEventListener('click', () => {
+                if (isRecording) {
+                    stopSpeechRecognition().catch((e) => console.error('stopSpeechRecognition failed:', e));
+                } else {
+                    startSpeechRecognition().catch((e) => console.error('startSpeechRecognition failed:', e));
+                }
+            });
+
+            // Initialize everything
+            initializeSpeechRecognition();
+
+            // 新增：在頁面完全載入（包括字體）後，強制刷新一次游標位置
+            window.addEventListener('load', () => {
+                // 這個監聽器確保在所有資源（特別是字體）都載入完成後執行
+                // 它會重新同步一次 textMetrics 工具，以獲取最準確的文字佈局
+                // 並重新渲染所有遠端游標，解決初始載入時位置偏移的問題
+                if (typeof textMetrics !== 'undefined' && typeof textMetrics.sync === 'function') {
+                    textMetrics.sync();
+                    renderRemoteCursors();
+                }
+            });
+
+// === 將舊的 Remote Cursor Sync Logic 區塊完全替換為這個新版本 ===
+
+            // --- Remote Cursor & Selection Sync Logic (Optimized) ---
+            const remoteCursorsOverlay = document.getElementById('remote-cursors-overlay');
+            const remoteCursors = {}; // { id: { cursorEl, selectionEl, start, end, name } }
+            let cursorUpdateThrottle;
+
+            // --- 1. Create a more robust measurement utility ---
+            const textMetrics = (function(textarea) {
+                const measurementDiv = document.createElement('div');
+                document.body.appendChild(measurementDiv);
+
+                function syncStyles() {
+                    const style = window.getComputedStyle(textarea);
+                    // Sync all critical properties for layout
+                    const props = [
+                        'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight',
+                        'letterSpacing', 'wordSpacing', 'textIndent', 'textTransform',
+                        'whiteSpace', 'wordWrap', 'wordBreak',
+                        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+                        'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+                        'boxSizing'
+                    ];
+                    props.forEach(prop => {
+                        measurementDiv.style[prop] = style[prop];
+                    });
+                    // Set position properties for accurate offset calculation
+                    measurementDiv.style.position = 'absolute';
+                    measurementDiv.style.top = '-9999px';
+                    measurementDiv.style.left = '0px';
+                    measurementDiv.style.width = textarea.clientWidth + 'px'; // Use clientWidth to account for padding
+                    measurementDiv.style.visibility = 'hidden';
+                }
+                
+                syncStyles(); // Initial sync
+
+                return {
+                    getCoords: function(position) {
+                        // Re-sync width in case of resize, less frequent than syncing all styles
+                        measurementDiv.style.width = textarea.clientWidth + 'px';
+
+                        const text = textarea.value;
+                        const before = text.substring(0, position);
+                        const after = text.substring(position);
+
+                        measurementDiv.innerHTML = ''; // Clear previous content
+
+                        const beforeSpan = document.createElement('span');
+                        beforeSpan.textContent = before;
+
+                        const targetSpan = document.createElement('span');
+                        targetSpan.textContent = ' '; // A placeholder character to measure
+
+                        const afterSpan = document.createElement('span');
+                        afterSpan.textContent = after;
+                        
+                        measurementDiv.appendChild(beforeSpan);
+                        measurementDiv.appendChild(targetSpan);
+                        measurementDiv.appendChild(afterSpan);
+                        
+                        // Calculate coordinates relative to the textarea's content area
+                        const coords = {
+                            top: targetSpan.offsetTop,
+                            left: targetSpan.offsetLeft,
+                            height: targetSpan.offsetHeight
+                        };
+                        
+                        return coords;
+                    },
+                    sync: syncStyles // Expose sync function to call on resize/font change
+                };
+            })(editor);
+
+
+            // --- 2. Improved rendering logic for cursors and selections ---
+            function renderRemoteCursors() {
+                if (!remoteCursorsOverlay) return;
+
+                Object.values(remoteCursors).forEach(data => {
+                    // Render Cursor
+                    const startCoords = textMetrics.getCoords(data.start);
+                    data.cursorEl.style.top = `${startCoords.top - editor.scrollTop}px`;
+                    data.cursorEl.style.left = `${startCoords.left - editor.scrollLeft}px`;
+                    data.cursorEl.style.height = `${startCoords.height}px`;
+
+                    // Render Selection
+                    if (data.start === data.end) {
+                        data.selectionEl.style.display = 'none';
+                    } else {
+                        data.selectionEl.style.display = 'block';
+                        const endCoords = textMetrics.getCoords(data.end);
+                        
+                        // Simple single-line selection logic
+                        if (startCoords.top === endCoords.top) {
+                            data.selectionEl.style.top = `${startCoords.top - editor.scrollTop}px`;
+                            data.selectionEl.style.left = `${startCoords.left - editor.scrollLeft}px`;
+                            data.selectionEl.style.width = `${endCoords.left - startCoords.left}px`;
+                            data.selectionEl.style.height = `${startCoords.height}px`;
+                        } else {
+                            // For multi-line selections, a more complex rendering logic is needed.
+                            // This simple version will just cover the start position.
+                            data.selectionEl.style.display = 'none'; // Hide for now to avoid incorrect rendering
+                        }
+                    }
+                });
+            }
+
+            // --- 3. Updated Socket.IO event handlers ---
+            function hashCode(str) {
+                let hash = 0;
+                for (let i = 0; i < str.length; i++) {
+                    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                return Math.abs(hash);
+            }
+
+            socket.on('cursor_update', (data) => {
+                if (!data.id || data.id === socket.id) return;
+
+                if (!remoteCursors[data.id]) {
+                    const color = `hsl(${hashCode(data.id) % 360}, 90%, 60%)`;
+                    const name = `User ${data.id.substring(0, 4)}`;
+                    
+                    // Create cursor element
+                    const cursorEl = document.createElement('div');
+                    cursorEl.className = 'remote-cursor';
+                    cursorEl.style.backgroundColor = color;
+                    cursorEl.setAttribute('data-label', name);
+                    
+                    // Create selection element
+                    const selectionEl = document.createElement('div');
+                    selectionEl.className = 'remote-selection';
+                    selectionEl.style.backgroundColor = color;
+
+                    remoteCursorsOverlay.appendChild(cursorEl);
+                    remoteCursorsOverlay.appendChild(selectionEl);
+
+                    remoteCursors[data.id] = { cursorEl, selectionEl, name };
+                }
+
+                remoteCursors[data.id].start = data.start;
+                remoteCursors[data.id].end = data.end;
+                renderRemoteCursors();
+            });
+
+            socket.on('user_disconnected', (data) => {
+                if (data.id && remoteCursors[data.id]) {
+                    remoteCursors[data.id].cursorEl.remove();
+                    remoteCursors[data.id].selectionEl.remove();
+                    delete remoteCursors[data.id];
+                }
+            });
+
+            // --- 4. Enhanced event listeners for syncing and rendering ---
+            document.addEventListener('selectionchange', () => {
+                if (document.activeElement === editor) {
+                    clearTimeout(cursorUpdateThrottle);
+                    cursorUpdateThrottle = setTimeout(() => {
+                        if (socket.connected) {
+                            socket.emit('cursor_sync', {
+                                room: ROOM_ID,
+                                id: socket.id,
+                                start: editor.selectionStart,
+                                end: editor.selectionEnd
+                            });
+                        }
+                    }, 50); // Shorten throttle for better responsiveness
+                }
+            });
+
+            // Re-render on scroll, resize, and font changes
+            editor.addEventListener('scroll', renderRemoteCursors);
+            window.addEventListener('resize', () => {
+                textMetrics.sync();
+                syncInterimTailLayout();
+                renderRemoteCursors();
+            });
+            // When director settings change, resync styles and render
+            [directorFontFamilySelect, directorFontSizeInput, directorLineHeightInput].forEach(el => {
+                el.addEventListener('input', () => {
+                    setTimeout(() => { // Wait for styles to apply
+                        textMetrics.sync();
+                        renderRemoteCursors();
+                    }, 0);
+                });
+            });
+
+            // Re-render when text is updated by collaboration
+            const originalStateUpdateHandler = socket._callbacks['$state_update'][0];
+            socket.off('state_update');
+            socket.on('state_update', (data) => {
+                originalStateUpdateHandler(data);
+                Promise.resolve().then(renderRemoteCursors);
+            });
+            const originalPatchHandler = socket._callbacks['$script_patched'][0];
+            socket.off('script_patched');
+            socket.on('script_patched', (data) => {
+                originalPatchHandler(data);
+                Promise.resolve().then(renderRemoteCursors);
+            });
+        });
+    </script>
+</body>
+</html>

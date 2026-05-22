@@ -1,0 +1,9 @@
+App
+  Name     = subtitle-viewer-flyio
+  Owner    = personal
+  Hostname = subtitle-viewer-flyio.fly.dev
+  Image    = subtitle-viewer-flyio:deployment-01KP85WDSFJTSV36HC5PX1D55M
+
+Machines
+PROCESS	ID            	VERSION	REGION	STATE  	ROLE	CHECKS            	LAST UPDATED
+web    	784ed2eced30d8	35     	sin   	started	    	1 total, 1 passing	2026-05-21T02:06:38Z

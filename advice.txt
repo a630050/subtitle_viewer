@@ -1,0 +1,273 @@
+# app.py
+import os
+import uuid
+import datetime
+import threading
+import time
+from flask import Flask, render_template, request, redirect, url_for
+from flask_socketio import SocketIO, emit, join_room, leave_room
+import diff_match_patch as dmp_module
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a_super_secret_key!')
+socketio = SocketIO(app, cors_allowed_origins="*", ping_interval=10, ping_timeout=5)
+dmp = dmp_module.diff_match_patch()
+
+class ScriptManager:
+    def __init__(self):
+        self.raw_text = "# 協作文本編輯器\n\n- 使用上方的按鈕進行語音識別、匯入/匯出、清除或替換文本。\n- 多個使用者可以同時在同一個房間內編輯。"
+        self.quick_inputs = {str(i): '' for i in range(1, 11)}
+        self.director_settings = {
+            'fontFamily': "'Microsoft JhengHei', '蘋方-繁', sans-serif",
+            'fontSize': '16px',
+            'lineHeight': 1.2,
+            'fontStyle': 'normal',
+            'fontWeight': 'normal',
+            'color': '#000000',
+            'backgroundColor': '#FFFFFF',
+            'theme': 'light'
+        }
+        self.viewer_settings = {
+            'fontFamily': "'Microsoft JhengHei', '蘋方-繁', sans-serif",
+            'fontSize': '40px',
+            'lineHeight': 1.4,
+            'fontStyle': 'normal',
+            'fontWeight': 'normal',
+            'color': '#FFFFFF',
+            'backgroundColor': '#000000',
+            'theme': 'dark'
+        }
+
+    def get_full_state(self):
+        return {
+            'raw_text': self.raw_text,
+            'quick_inputs': self.quick_inputs,
+            'director_settings': self.director_settings,
+            'viewer_settings': self.viewer_settings
+        }
+
+    def update_script(self, new_raw_text):
+        self.raw_text = new_raw_text
+
+    def update_quick_inputs(self, new_inputs):
+        for key, value in new_inputs.items():
+            if key in self.quick_inputs:
+                self.quick_inputs[key] = str(value)
+
+    def update_settings(self, new_settings: dict, target: str):
+        if not isinstance(new_settings, dict):
+            return
+        valid_keys = ['fontFamily','fontSize','lineHeight','fontStyle','fontWeight','color','backgroundColor','theme']
+        if target == 'director':
+            for k in valid_keys:
+                if k in new_settings:
+                    self.director_settings[k] = new_settings[k]
+        elif target == 'viewer':
+            for k in valid_keys:
+                if k in new_settings:
+                    self.viewer_settings[k] = new_settings[k]
+
+    def patch_script(self, patch_text):
+        try:
+            patches = dmp.patch_fromText(patch_text)
+            new_text, results = dmp.patch_apply(patches, self.raw_text)
+            if all(results):
+                self.raw_text = new_text
+                return True
+            else:
+                return False
+        except:
+            return False
+
+rooms = {}
+viewer_to_room = {}
+lock = threading.Lock()
+
+@app.route('/')
+def home():
+    return """<h1>協作編輯器</h1><p>點選下方連結來建立一個新的、獨立的編輯房間。</p><a href=\"/new_room\" style=\"font-size: 20px; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;\">建立新房間</a>"""
+
+@app.route('/new_room')
+def new_room():
+    director_id = str(uuid.uuid4().hex)[:8]
+    viewer_id = str(uuid.uuid4().hex)
+    with lock:
+        rooms[director_id] = {
+            'manager': ScriptManager(),
+            'last_active': datetime.datetime.now(),
+            'directors': set(),
+            'viewer_id': viewer_id
+        }
+        viewer_to_room[viewer_id] = director_id
+    return redirect(url_for('director_room', room_id=director_id))
+
+@app.route('/room/<string:room_id>')
+def director_room(room_id):
+    if room_id not in rooms:
+        return "房間不存在或已過期！<a href='/'>返回首頁</a>", 404
+    return render_template('index.html', room_id=room_id)
+
+@app.route('/view/<string:viewer_id>')
+def viewer_room(viewer_id):
+    with lock:
+        director_id = viewer_to_room.get(viewer_id)
+    if not director_id or director_id not in rooms:
+        return "房間不存在或已過期！<a href='/'>返回首頁</a>", 404
+    return render_template('viewer.html', room_id=director_id)
+
+def get_room_manager(room_id):
+    with lock:
+        room_data = rooms.get(room_id)
+    if room_data:
+        return room_data.get('manager')
+    return None
+
+def update_last_active(room_id):
+    with lock:
+        if room_id in rooms:
+            rooms[room_id]['last_active'] = datetime.datetime.now()
+
+def broadcast_connection_counts(room_id):
+    with lock:
+        if room_id in rooms:
+            director_count = len(rooms[room_id].get('directors', []))
+            socketio.emit('connection_update', { 'directors': director_count }, to=room_id)
+
+@socketio.on('join')
+def on_join(data):
+    room_id = data.get('room')
+    sid = request.sid
+    if room_id and room_id in rooms:
+        join_room(room_id)
+        with lock:
+            rooms[room_id]['directors'].add(sid)
+        manager = get_room_manager(room_id)
+        if manager:
+            state = manager.get_full_state()
+            with lock:
+                viewer_id = rooms.get(room_id, {}).get('viewer_id')
+            state['viewer_id'] = viewer_id
+            emit('state_update', state)
+            update_last_active(room_id)
+
+@socketio.on('update_script')
+def handle_script_update(data):
+    room_id = data.get('room')
+    manager = get_room_manager(room_id)
+    if manager:
+        manager.update_script(data.get('raw_text', ''))
+        state = manager.get_full_state()
+        emit('state_update', state, to=room_id)
+        update_last_active(room_id)
+
+@socketio.on('update_settings')
+def handle_update_settings(data):
+    room_id = data.get('room')
+    settings = data.get('settings', {})
+    target = data.get('target', 'director')
+    manager = get_room_manager(room_id)
+    if manager:
+        manager.update_settings(settings, target)
+        if target == 'director':
+            emit('director_settings_update', { 'settings': manager.director_settings }, to=room_id)
+        elif target == 'viewer':
+            emit('viewer_settings_update', { 'settings': manager.viewer_settings }, to=room_id)
+        update_last_active(room_id)
+
+@socketio.on('patch_script')
+def handle_script_patch(data):
+    room_id = data.get('room')
+    manager = get_room_manager(room_id)
+    if manager:
+        patch_text = data.get('patch', '')
+        success = manager.patch_script(patch_text)
+        if success:
+            emit('script_patched', data, to=room_id, include_self=False)
+            update_last_active(room_id)
+        else:
+            state = manager.get_full_state()
+            emit('state_update', state, to=room_id)
+
+@socketio.on('update_quick_inputs')
+def handle_quick_inputs_update(data):
+    room_id = data.get('room')
+    manager = get_room_manager(room_id)
+    if manager:
+        manager.update_quick_inputs(data.get('inputs', {}))
+        state = manager.get_full_state()
+        emit('state_update', state, to=room_id)
+        update_last_active(room_id)
+
+@socketio.on('cursor_sync')
+def handle_cursor_sync(data):
+    room_id = data.get('room')
+    if room_id in rooms:
+        emit('cursor_update', data, to=room_id, include_self=False)
+        update_last_active(room_id)
+
+@socketio.on('interim_text')
+def handle_interim_text(data):
+    room_id = data.get('room')
+    text = data.get('text', '')
+    if room_id in rooms:
+        emit('interim_update', { 'text': text }, to=room_id)
+        update_last_active(room_id)
+
+@socketio.on('ping')
+def handle_ping(data):
+    room_id = data.get('room')
+    if room_id and room_id in rooms:
+        emit('pong', {'timestamp': data.get('timestamp')})
+        update_last_active(room_id)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    room_to_update = None
+    with lock:
+        for room_id, data in rooms.items():
+            if sid in data.get('directors', set()):
+                data['directors'].remove(sid)
+                room_to_update = room_id
+                break
+    if room_to_update:
+        broadcast_connection_counts(room_to_update)
+
+CLEANUP_INTERVAL_SECONDS = 60 * 5
+INACTIVITY_TIMEOUT_SECONDS = 60 * 60 * 24
+
+def cleanup_inactive_rooms():
+    while True:
+        now = datetime.datetime.now()
+        rooms_to_delete = []
+        with lock:
+            for director_id, data in rooms.items():
+                last_active_time = data['last_active']
+                if (now - last_active_time).total_seconds() > INACTIVITY_TIMEOUT_SECONDS:
+                    rooms_to_delete.append(director_id)
+        if rooms_to_delete:
+            with lock:
+                for director_id in rooms_to_delete:
+                    if director_id in rooms:
+                        del rooms[director_id]
+        time.sleep(CLEANUP_INTERVAL_SECONDS)
+
+if __name__ == '__main__':
+    cleanup_thread = threading.Thread(target=cleanup_inactive_rooms, daemon=True)
+    cleanup_thread.start()
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
+
+
+<!-- index.html 修改 -->
+<script>
+// 在原本的 saveSettings / applyTheme 時：
+// 改成 socket.emit('update_settings', { room: ROOM_ID, settings: {...}, target: 'director' });
+</script>
+
+<!-- viewer.html 修改 -->
+<script>
+// 改成監聽 viewer_settings_update 事件，而不是共用 settings_update
+socket.on('viewer_settings_update', (payload) => {
+  if (payload && payload.settings) applyViewerSettings(payload.settings);
+});
+</script>

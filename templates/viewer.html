@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>觀眾視窗</title>
+  <!-- 引入 QRCode.js 函式庫 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    html, body { height: 100%; margin: 0; scroll-behavior: smooth; }
+    body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif; overflow-y: auto; }
+    .viewer-container { box-sizing: border-box; padding: 0; width: 100%; min-height: 100%; display: block; }
+    .viewer-text {
+      box-sizing: border-box; 
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      width: 100%;
+      max-width: none;
+      padding: 40px;
+      font-size: 60px;
+      line-height: 1.4;
+      color: #fff;
+    }
+    .viewer-interim {
+      box-sizing: border-box;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      width: 100%;
+      max-width: none;
+      padding: 0 40px 40px;
+      font-size: 60px;
+      line-height: 1.4;
+      color: #fff;
+      opacity: 0.7;
+      min-height: 1.4em;
+    }
+    .viewer-interim.holding-space {
+      visibility: hidden;
+    }
+    .scroll-to-bottom-btn {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        cursor: pointer;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        transition: opacity 0.2s, transform 0.2s;
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+    }
+    .scroll-to-bottom-btn.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+    .scroll-to-bottom-btn:hover {
+        background-color: rgba(255, 255, 255, 0.4);
+    }
+    .scroll-to-bottom-btn svg {
+        width: 24px;
+        height: 24px;
+        stroke: #fff;
+    }
+    .scroll-to-bottom-btn.light-mode-fab {
+        background-color: rgba(0, 0, 0, 0.5); /* 改為半透明黑色背景 */
+        color: white; /* 確保 SVG 顏色繼承為白色 */
+        border: none; /* 移除邊框 */
+    }
+    .scroll-to-bottom-btn.light-mode-fab:hover {
+        background-color: rgba(0, 0, 0, 0.7); /* 滑鼠懸停時加深顏色 */
+    }
+    .scroll-to-bottom-btn.light-mode-fab svg {
+        stroke: white; /* 明確指定 SVG 線條顏色為白色 */
+    }	
+    
+    /* --- 新增：FAB (浮動操作按鈕) 樣式 --- */
+	.fab-container {
+        position: fixed;
+        top: 10px; /* 改為 top */
+        right: 10px; /* 改為 right */
+        z-index: 100;
+        display: flex;
+        flex-direction: column; /* 改為 column，讓選單向下展開 */
+        align-items: flex-end; /* 改為 flex-end 讓選單靠右對齊 */
+    }
+    #fab-menu {
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: flex-end;
+        margin-bottom: 8px;
+        transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+        opacity: 0;
+        transform: translateY(-10px);
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .fab-container.active #fab-menu {
+        opacity: 1;
+        transform: translateY(0);
+        visibility: visible;
+        pointer-events: auto;
+    }
+    .fab-option {
+        display: flex;
+        align-items: center;
+        background-color: rgba(255, 255, 255, 0.9);
+        color: #333;
+        border: none;
+        border-radius: 20px;
+        padding: 6px 14px;
+        margin-bottom: 0px;
+		margin-top: 8px; /* 改回頂部邊距 */
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        white-space: nowrap;
+    }
+    #fab-toggle-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background-color: #0d6efd;
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        line-height: 1;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3); /* 陰影略微縮小 */
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out, background-color 0.2s;
+    }
+    #fab-toggle-btn:hover {
+        background-color: #0b5ed7;
+    }
+    .fab-container.active #fab-toggle-btn {
+        transform: rotate(45deg);
+    }
+
+    /* --- 新增：QR Code Modal 樣式 --- */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .modal-content {
+        background-color: #fff;
+        padding: 24px;
+        border-radius: 8px;
+        text-align: center;
+        color: #333;
+    }
+    .modal-content h4 {
+        margin-top: 0;
+        margin-bottom: 16px;
+    }
+    #viewer-qrcode-container {
+        width: 200px;
+        height: 200px;
+        margin: 0 auto;
+        padding: 10px;
+        background: white;
+        border: 1px solid #eee;
+    }
+    #viewer-share-close-btn {
+        margin-top: 20px;
+        padding: 8px 16px;
+        font-size: 15px;
+        cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="viewer-container">
+    <div id="viewer-text" class="viewer-text"></div>
+    <div id="viewer-interim" class="viewer-interim" aria-live="polite"></div>
+  </div>
+
+  <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" title="捲動到底部">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </button>
+
+  <!-- 新增：FAB (浮動操作按鈕) 區塊 -->
+	<div id="fab-container" class="fab-container">
+      <button id="fab-toggle-btn" title="功能選單">+</button>
+      <div id="fab-menu">
+          <button id="fab-copy-btn" class="fab-option">複製所有字幕</button>
+          <button id="fab-qrcode-btn" class="fab-option">QRCode</button>
+      </div>
+	</div>
+  
+  <!-- 新增：QR Code Modal 區塊 -->
+  <div id="viewer-share-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+          <h4>觀眾端連結 QRCode</h4>
+          <div id="viewer-qrcode-container"></div>
+          <button id="viewer-share-close-btn">關閉</button>
+      </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/gh/google/diff-match-patch@master/javascript/diff_match_patch.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const socket = io({ transports: ["websocket"] });
+      const ROOM_ID = "{{ room_id }}";
+      const viewerContainer = document.querySelector('.viewer-container');
+      const viewerText = document.getElementById('viewer-text');
+      const viewerInterim = document.getElementById('viewer-interim');
+      const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+      const scrollEl = document.scrollingElement || document.documentElement;
+      let dmp = new diff_match_patch();
+      let currentText = '';
+      let shouldAutoScroll = true;
+      const INTERIM_COLLAPSE_MAX_HOLD_MS = 1800;
+      let interimCollapseTimer = null;
+      let viewerInterimHoldHeightPx = 0;
+      let isHoldingViewerInterimSpace = false;
+
+      // --- 新增：FAB & Modal 相關 DOM 元素 ---
+      const fabContainer = document.getElementById('fab-container');
+      const fabToggleBtn = document.getElementById('fab-toggle-btn');
+      const fabCopyBtn = document.getElementById('fab-copy-btn');
+      const fabQrcodeBtn = document.getElementById('fab-qrcode-btn');
+      const viewerShareModal = document.getElementById('viewer-share-modal');
+      const viewerQrcodeContainer = document.getElementById('viewer-qrcode-container');
+      const viewerShareCloseBtn = document.getElementById('viewer-share-close-btn');
+
+
+      // --- Auto-scroll Logic ---
+      function isScrolledToBottom() {
+          // 嚴格判定：除非使用者主動上滑超過 0.8 頁的高度，否則都會自動置底
+          const threshold = Math.max(150, scrollEl.clientHeight * 0.8);
+          return scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= threshold;
+      }
+
+      let isProgrammaticScroll = false;
+      function scrollToBottom() {
+          isProgrammaticScroll = true;
+          scrollEl.scrollTop = scrollEl.scrollHeight;
+          setTimeout(() => { isProgrammaticScroll = false; }, 50);
+      }
+
+      async function toggleFullscreen() {
+          try {
+              if (document.fullscreenElement) {
+                  await document.exitFullscreen();
+              } else {
+                  await document.documentElement.requestFullscreen();
+              }
+          } catch (e) {}
+      }
+
+      function handleScroll() {
+          if (isProgrammaticScroll) return;
+          const atBottom = isScrolledToBottom();
+          shouldAutoScroll = atBottom;
+          if (atBottom) {
+              scrollToBottomBtn.classList.remove('visible');
+          } else {
+              scrollToBottomBtn.classList.add('visible');
+          }
+      }
+
+      function wrapUpdateFunction(updateFn) {
+          return function(...args) {
+              if (isScrolledToBottom()) {
+                  shouldAutoScroll = true;
+              }
+              const savedScrollTop = scrollEl.scrollTop;
+              const wasAutoScroll = shouldAutoScroll;
+              
+              updateFn(...args);
+              
+              if (wasAutoScroll) {
+                  scrollToBottom();
+                  setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); handleScroll(); }, 10);
+                  setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); handleScroll(); }, 100);
+              } else {
+                  scrollEl.scrollTop = savedScrollTop;
+                  handleScroll();
+              }
+          }
+      }
+
+      function clearInterimCollapseTimer() {
+          if (!interimCollapseTimer) return;
+          clearTimeout(interimCollapseTimer);
+          interimCollapseTimer = null;
+      }
+
+      function getViewerInterimHeightPx() {
+          return Math.ceil(viewerInterim.getBoundingClientRect().height || 0);
+      }
+
+      function releaseViewerInterimHoldSpace() {
+          clearInterimCollapseTimer();
+          isHoldingViewerInterimSpace = false;
+          viewerInterim.classList.remove('holding-space');
+          viewerInterim.style.minHeight = '1.4em';
+          viewerInterim.textContent = '';
+      }
+
+      function holdViewerInterimSpace() {
+          const measuredHeight = getViewerInterimHeightPx();
+          if (measuredHeight > 0) {
+              viewerInterimHoldHeightPx = measuredHeight;
+          }
+          if (viewerInterimHoldHeightPx <= 0) {
+              releaseViewerInterimHoldSpace();
+              return;
+          }
+          isHoldingViewerInterimSpace = true;
+          viewerInterim.classList.add('holding-space');
+          viewerInterim.style.minHeight = `${viewerInterimHoldHeightPx}px`;
+          viewerInterim.textContent = '\u00A0';
+          clearInterimCollapseTimer();
+          interimCollapseTimer = setTimeout(() => {
+              releaseViewerInterimHoldSpace();
+              if (shouldAutoScroll) scrollToBottom();
+          }, INTERIM_COLLAPSE_MAX_HOLD_MS);
+      }
+
+      function notifyViewerMainTextUpdated() {
+          if (isHoldingViewerInterimSpace) {
+              releaseViewerInterimHoldSpace();
+          }
+      }
+
+      function setViewerInterimText(text) {
+          const next = String(text || '');
+          if (!next.trim()) {
+              const shouldHoldSpace = isHoldingViewerInterimSpace || String(viewerInterim.textContent || '').trim().length > 0;
+              if (shouldHoldSpace) {
+                  holdViewerInterimSpace();
+              } else {
+                  releaseViewerInterimHoldSpace();
+              }
+              return;
+          }
+          clearInterimCollapseTimer();
+          isHoldingViewerInterimSpace = false;
+          viewerInterim.classList.remove('holding-space');
+          viewerInterim.style.minHeight = '1.4em';
+          viewerInterim.textContent = next;
+          viewerInterimHoldHeightPx = getViewerInterimHeightPx();
+      }
+
+      const wrappedRender = wrapUpdateFunction((text) => {
+        currentText = text;
+        viewerText.textContent = text;
+        notifyViewerMainTextUpdated();
+      });
+
+      socket.on('connect', () => {
+        socket.emit('join', { room: ROOM_ID, role: 'viewer' });
+      });
+
+		// === 將上面的函式替換為這個正確的版本 ===
+		function applyViewerSettings(settings) {
+			if (!settings) return;
+
+			// 1. 套用所有非顏色相關的設定
+			if (settings.fontFamily) viewerText.style.fontFamily = settings.fontFamily;
+			if (settings.fontSize) viewerText.style.fontSize = settings.fontSize;
+			if (settings.lineHeight) viewerText.style.lineHeight = settings.lineHeight;
+			if (settings.fontStyle) viewerText.style.fontStyle = settings.fontStyle;
+			if (settings.fontWeight) viewerText.style.fontWeight = settings.fontWeight;
+            if (settings.fontFamily) viewerInterim.style.fontFamily = settings.fontFamily;
+            if (settings.fontSize) viewerInterim.style.fontSize = settings.fontSize;
+            if (settings.lineHeight) viewerInterim.style.lineHeight = settings.lineHeight;
+            if (settings.fontStyle) viewerInterim.style.fontStyle = settings.fontStyle;
+            if (settings.fontWeight) viewerInterim.style.fontWeight = settings.fontWeight;
+
+			// 2. 【核心修改】直接使用從導播端傳來的顏色值
+            // 這樣才能響應導播端的任何顏色修改
+			if (settings.backgroundColor) {
+                document.body.style.backgroundColor = settings.backgroundColor;
+            }
+            if (settings.color) {
+                viewerText.style.color = settings.color;
+                viewerInterim.style.color = settings.color;
+            }
+
+			// 3. 根據主題決定「捲動按鈕」的樣式 (這部分保留)
+			if (settings.theme === 'dark') {
+              scrollToBottomBtn.classList.remove('light-mode-fab');
+			} else {
+              scrollToBottomBtn.classList.add('light-mode-fab');
+			}
+		}
+
+      socket.on('state_update', (state) => {
+        if (state && state.viewer_settings) {
+          applyViewerSettings(state.viewer_settings);
+        }
+        if (typeof state.raw_text === 'string') {
+          wrappedRender(state.raw_text);
+        }
+        setViewerInterimText(state?.interim_text || '');
+      });
+
+      socket.on('viewer_settings_update', (payload) => {
+        if (payload && payload.settings) {
+          applyViewerSettings(payload.settings);
+        }
+      });
+
+      socket.on('script_patched', wrapUpdateFunction((data) => {
+        try {
+          const patches = dmp.patch_fromText(data.patch || '');
+          const [newText, results] = dmp.patch_apply(patches, currentText);
+          if (results.some(r => !r)) {
+            socket.emit('join', { room: ROOM_ID, role: 'viewer' });
+            return;
+          }
+          wrappedRender(newText);
+        } catch(e) {
+          socket.emit('join', { room: ROOM_ID, role: 'viewer' });
+        }
+      }));
+
+      socket.on('interim_update', wrapUpdateFunction((payload) => {
+          setViewerInterimText(payload?.text || '');
+      }));
+
+      // 定期偵測並強制滾動置底，確保不會因為偶發的 DOM 渲染延遲而卡住
+      setInterval(() => {
+          if (shouldAutoScroll) {
+              scrollToBottom();
+          }
+      }, 1500);
+
+      // --- 新增：FAB & Modal Logic ---
+
+      // 主按鈕：展開/收合選單
+      fabToggleBtn.addEventListener('click', () => {
+          fabContainer.classList.toggle('active');
+      });
+
+      // 選項一：複製所有字幕
+      fabCopyBtn.addEventListener('click', () => {
+          if (navigator.clipboard) {
+              navigator.clipboard.writeText(currentText).then(() => {
+                  const originalText = fabCopyBtn.textContent;
+                  fabCopyBtn.textContent = '已複製!';
+                  setTimeout(() => {
+                      fabCopyBtn.textContent = originalText;
+                  }, 2000);
+              }).catch(err => {
+                  alert('複製失敗，請檢查瀏覽器權限。');
+              });
+          } else {
+              alert('您的瀏覽器不支援自動複製功能。');
+          }
+          fabContainer.classList.remove('active'); // 點擊後收合選單
+      });
+
+      // 選項二：顯示 QR Code
+      fabQrcodeBtn.addEventListener('click', () => {
+          const viewerUrl = window.location.href;
+          viewerQrcodeContainer.innerHTML = ''; // 清空舊的 QR Code
+          try {
+              new QRCode(viewerQrcodeContainer, {
+                  text: viewerUrl,
+                  width: 200,
+                  height: 200,
+                  correctLevel: QRCode.CorrectLevel.M
+              });
+              viewerShareModal.style.display = 'flex';
+          } catch(e) {
+              alert('無法生成 QR Code。');
+          }
+          fabContainer.classList.remove('active'); // 點擊後收合選單
+      });
+      
+      // 關閉 QR Code Modal
+      viewerShareCloseBtn.addEventListener('click', () => {
+          viewerShareModal.style.display = 'none';
+      });
+      viewerShareModal.addEventListener('click', (event) => {
+          if (event.target === viewerShareModal) { // 點擊背景遮罩時關閉
+              viewerShareModal.style.display = 'none';
+          }
+      });
+
+      // Event Listeners
+      window.addEventListener('scroll', handleScroll);
+      scrollToBottomBtn.addEventListener('click', () => {
+          shouldAutoScroll = true;
+          scrollToBottom();
+          handleScroll();
+      });
+      viewerContainer.addEventListener('dblclick', (e) => {
+          if (e.button !== 0) return;
+          toggleFullscreen();
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+flask
+flask-socketio
+diff-match-patch
+gunicorn
+eventlet
