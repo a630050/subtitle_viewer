@@ -92,7 +92,8 @@ class ScriptManager:
             'fontWeight': 'normal',
             'color': '#FFFFFF',
             'backgroundColor': '#000000',
-            'theme': 'dark'
+            'theme': 'dark',
+            'forceScrollBottom': False
         }
         self.speech_user = None
         self.interim_text = ''
@@ -140,6 +141,14 @@ class ScriptManager:
 
     def update_viewer_settings(self, new_settings: dict):
         self._update_settings_helper(self.viewer_settings, new_settings)
+        if not isinstance(new_settings, dict):
+            return
+        if 'forceScrollBottom' in new_settings:
+            value = new_settings['forceScrollBottom']
+            if isinstance(value, str):
+                self.viewer_settings['forceScrollBottom'] = value.lower() in {'1', 'true', 'yes', 'on'}
+            else:
+                self.viewer_settings['forceScrollBottom'] = bool(value)
 
     def patch_script(self, patch_text):
         try:

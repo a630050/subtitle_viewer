@@ -504,6 +504,12 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     <label for="viewer-bg-color-input">背景顏色</label>
                     <input type="color" id="viewer-bg-color-input" value="#000000">
                 </div>
+                <div class="style-control">
+                    <label>
+                        <input type="checkbox" id="viewer-force-scroll-bottom-input">
+                        觀眾端強制捲動置底
+                    </label>
+                </div>
             </div>
 
             <div class="settings-actions" style="margin-top: 8px; margin-bottom: 50px;">
@@ -638,6 +644,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             const viewerFontColorInput = document.getElementById('viewer-font-color-input');
             const viewerBgColorInput = document.getElementById('viewer-bg-color-input');
             const viewerLineHeightInput = document.getElementById('viewer-line-height-input');
+            const viewerForceScrollBottomInput = document.getElementById('viewer-force-scroll-bottom-input');
 
             const darkModeToggle = document.getElementById('dark-mode-toggle');
             const settingsSaveBtn = document.getElementById('settings-save-btn');
@@ -1166,7 +1173,8 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     fontStyle: viewerFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
                     fontWeight: viewerFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
                     color: viewerFontColorInput.value,
-                    backgroundColor: viewerBgColorInput.value
+                    backgroundColor: viewerBgColorInput.value,
+                    forceScrollBottom: viewerForceScrollBottomInput.checked
                 };
                 localStorage.setItem('viewerEditorSettings', JSON.stringify(settings));
                 
@@ -1233,6 +1241,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 }
                 viewerFontColorInput.value = settings.color || '#FFFFFF';
                 viewerBgColorInput.value = settings.backgroundColor || '#000000';
+                viewerForceScrollBottomInput.checked = Boolean(settings.forceScrollBottom);
             }
 
             function importSettingsFromJson(jsonText) {
@@ -1280,7 +1289,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             });
 
             // Viewer settings logic remains unchanged, as it doesn't need to apply locally.
-            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput].forEach(el => {
+            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput, viewerForceScrollBottomInput].forEach(el => {
                 el.addEventListener('input', saveViewerSettings);
             });
 

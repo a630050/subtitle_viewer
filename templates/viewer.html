@@ -232,6 +232,7 @@
       let dmp = new diff_match_patch();
       let currentText = '';
       let shouldAutoScroll = true;
+      let forceScrollBottom = false;
       const INTERIM_COLLAPSE_MAX_HOLD_MS = 1800;
       let interimCollapseTimer = null;
       let viewerInterimHoldHeightPx = 0;
@@ -261,6 +262,23 @@
           setTimeout(() => { isProgrammaticScroll = false; }, 50);
       }
 
+      function enforceScrollBottom() {
+          if (!forceScrollBottom) return;
+          shouldAutoScroll = true;
+          scrollToBottomBtn.classList.remove('visible');
+          scrollToBottom();
+      }
+
+      function setForceScrollBottom(enabled) {
+          forceScrollBottom = Boolean(enabled);
+          if (forceScrollBottom) {
+              enforceScrollBottom();
+              setTimeout(enforceScrollBottom, 50);
+          } else {
+              handleScroll();
+          }
+      }
+
       async function toggleFullscreen() {
           try {
               if (document.fullscreenElement) {
@@ -273,6 +291,10 @@
 
       function handleScroll() {
           if (isProgrammaticScroll) return;
+          if (forceScrollBottom) {
+              enforceScrollBottom();
+              return;
+          }
           const atBottom = isScrolledToBottom();
           shouldAutoScroll = atBottom;
           if (atBottom) {
@@ -296,6 +318,7 @@
                   scrollToBottom();
                   setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); handleScroll(); }, 10);
                   setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); handleScroll(); }, 100);
+                  setTimeout(enforceScrollBottom, 150);
               } else {
                   scrollEl.scrollTop = savedScrollTop;
                   handleScroll();
@@ -408,6 +431,7 @@
 			} else {
               scrollToBottomBtn.classList.add('light-mode-fab');
 			}
+            setForceScrollBottom(settings.forceScrollBottom);
 		}
 
       socket.on('state_update', (state) => {
@@ -450,6 +474,7 @@
               scrollToBottom();
           }
       }, 1500);
+      setInterval(enforceScrollBottom, 500);
 
       // --- 新增：FAB & Modal Logic ---
 
@@ -506,6 +531,24 @@
 
       // Event Listeners
       window.addEventListener('scroll', handleScroll);
+      window.addEventListener('wheel', (event) => {
+          if (!forceScrollBottom) return;
+          event.preventDefault();
+          enforceScrollBottom();
+      }, { passive: false });
+      window.addEventListener('touchmove', (event) => {
+          if (!forceScrollBottom) return;
+          event.preventDefault();
+          enforceScrollBottom();
+      }, { passive: false });
+      window.addEventListener('keydown', (event) => {
+          if (!forceScrollBottom) return;
+          const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
+          if (scrollKeys.has(event.key)) {
+              event.preventDefault();
+              enforceScrollBottom();
+          }
+      });
       scrollToBottomBtn.addEventListener('click', () => {
           shouldAutoScroll = true;
           scrollToBottom();
