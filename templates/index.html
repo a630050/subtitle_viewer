@@ -66,6 +66,19 @@ body.dark-mode .file-buttons .share-btn { background-color: #375a7f; border-colo
         .style-control { margin-bottom: 15px; }
         .style-control label { display: block; margin-bottom: 5px; font-size: 14px; color: #333; }
         .style-control input, .style-control select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .style-control.checkbox-control label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+        .style-control.checkbox-control input[type="checkbox"] {
+            width: auto;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+        }
         .setting-tip {
             margin-left: 6px;
             color: #2b7de9;
@@ -504,10 +517,10 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     <label for="viewer-bg-color-input">背景顏色</label>
                     <input type="color" id="viewer-bg-color-input" value="#000000">
                 </div>
-                <div class="style-control">
+                <div class="style-control checkbox-control">
                     <label>
-                        <input type="checkbox" id="viewer-force-scroll-bottom-input">
                         觀眾端強制捲動置底
+                        <input type="checkbox" id="viewer-force-scroll-bottom-input">
                     </label>
                 </div>
             </div>
