@@ -1,5 +1,5 @@
 flask
 flask-socketio
 diff-match-patch
-gunicorn
+gunicorn<26
 eventlet
