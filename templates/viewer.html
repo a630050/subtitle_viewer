@@ -33,12 +33,23 @@
       font-size: 60px;
       line-height: 1.4;
       color: #fff;
-      opacity: 0.7;
+      opacity: 1; /* 觀眾端統一實色：語音未落地的字也與正式文字同色 */
       min-height: 1.4em;
     }
     .viewer-interim.holding-space {
       visibility: hidden;
     }
+    /* v2：就地顯示在正確位置的「組字中（尚未落地）」文字。預設與已落地文字同為實色。 */
+    .viewer-interim-inline {
+      opacity: 1;
+      color: inherit;
+    }
+    /* 「未落地文字淡色處理」勾選時：組字中與語音未落地文字以淡色顯示。
+       不過淡（比初版深一點），並依明暗模式微調：暗底較易顯弱，故給高一點的不透明度。 */
+    body.fade-interim .viewer-interim,
+    body.fade-interim .viewer-interim-inline { opacity: 0.72; }
+    body.fade-interim.viewer-dark .viewer-interim,
+    body.fade-interim.viewer-dark .viewer-interim-inline { opacity: 0.8; }
     .scroll-to-bottom-btn {
         position: fixed;
         bottom: 10px;
@@ -231,6 +242,7 @@
       const scrollEl = document.scrollingElement || document.documentElement;
       let dmp = new diff_match_patch();
       let currentText = '';
+      const remoteCompositions = {}; // 其他編修端正在組字（尚未落地）的內容：{ id: { text, anchor } }
       let shouldAutoScroll = true;
       let forceScrollBottom = false;
       let collaborationMode = 'human_ai';
@@ -285,10 +297,11 @@
           }
       }
 
-      // 人工聽打模式的捲動目標：有淡色組字暫存時捲到絕對底部（顯示組字預覽），
+      // 人工聽打模式的捲動目標：有 inline 組字或語音暫存時捲到絕對底部（顯示預覽），
       // 否則對齊最後一行正式文字（避免底部留白）。
       function manualScrollTarget() {
-          if (String(viewerInterim.textContent || '').trim()) {
+          const hasComposition = Object.values(remoteCompositions).some((c) => c && c.text);
+          if (hasComposition || String(viewerInterim.textContent || '').trim()) {
               return Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
           }
           return getLastTextLineScrollTop();
@@ -449,9 +462,34 @@
           viewerInterimHoldHeightPx = getViewerInterimHeightPx();
       }
 
+      // 將正式文字 + 各編修端「組字中（淡色、尚未落地）」內容，就地 inline 渲染到正確位置。
+      function renderViewerContent() {
+          const text = String(currentText || '');
+          const comps = Object.values(remoteCompositions).filter((c) => c && c.text);
+          if (comps.length === 0) {
+              viewerText.textContent = text;
+              return;
+          }
+          comps.sort((a, b) => (a.anchor || 0) - (b.anchor || 0));
+          viewerText.textContent = '';
+          let pos = 0;
+          for (const c of comps) {
+              const a = Math.max(0, Math.min(c.anchor || 0, text.length));
+              // 落地瞬間防重影：若正式文字在 anchor 處已含這段組字（patch 已到、clear 還沒到），就不重複顯示。
+              if (text.substr(a, c.text.length) === c.text) continue;
+              if (a > pos) viewerText.appendChild(document.createTextNode(text.slice(pos, a)));
+              const span = document.createElement('span');
+              span.className = 'viewer-interim-inline';
+              span.textContent = c.text;
+              viewerText.appendChild(span);
+              pos = a; // 組字是「插入」而非取代，故不前移已落地文字的指標
+          }
+          if (pos < text.length) viewerText.appendChild(document.createTextNode(text.slice(pos)));
+      }
+
       const wrappedRender = wrapUpdateFunction((text) => {
         currentText = text;
-        viewerText.textContent = text;
+        renderViewerContent();
         notifyViewerMainTextUpdated();
       });
 
@@ -491,6 +529,9 @@
 			} else {
               scrollToBottomBtn.classList.add('light-mode-fab');
 			}
+            document.body.classList.toggle('viewer-dark', settings.theme === 'dark');
+            // 未落地文字（組字中／語音未落地）淡色處理：勾選→淡色、取消→實色，預設勾選。
+            document.body.classList.toggle('fade-interim', settings.fadeInterim !== false);
             setForceScrollBottom(settings.forceScrollBottom);
 		}
 
@@ -536,6 +577,25 @@
       socket.on('interim_update', wrapUpdateFunction((payload) => {
           setViewerInterimText(payload?.text || '');
       }));
+
+      // v2：其他編修端「組字中」的內容，就地 inline 顯示在正確位置（淡色），落地後由 patch 帶出實色。
+      socket.on('composition_update', wrapUpdateFunction((data) => {
+          if (!data || !data.id) return;
+          const text = String(data.text || '');
+          if (!text) {
+              delete remoteCompositions[data.id];
+          } else {
+              remoteCompositions[data.id] = { text, anchor: Number(data.anchor) || 0 };
+          }
+          renderViewerContent();
+      }));
+
+      socket.on('user_disconnected', (data) => {
+          if (data && data.id && remoteCompositions[data.id]) {
+              delete remoteCompositions[data.id];
+              renderViewerContent();
+          }
+      });
 
       // 定期偵測並強制滾動置底，確保不會因為偶發的 DOM 渲染延遲而卡住
       setInterval(() => {

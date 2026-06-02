@@ -367,6 +367,20 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             background-color: blue; /* 顏色會由 JS 動態設定 */
             opacity: 0.3;
         }
+        /* 遠端使用者「組字中（尚未落地）」的淡色預覽，疊在 textarea 對應位置 */
+        .remote-composition {
+            position: absolute;
+            white-space: pre;
+            pointer-events: none;
+            z-index: 5;
+            color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(255, 235, 130, 0.35); /* 淡黃底，提示這是未落地的暫定文字 */
+            border-radius: 2px;
+        }
+        body.dark-mode .remote-composition {
+            color: rgba(255, 255, 255, 0.6);
+            background-color: rgba(255, 235, 130, 0.18);
+        }
 
     </style>
 </head>
@@ -530,6 +544,13 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                         <input type="checkbox" id="viewer-force-scroll-bottom-input">
                     </label>
                 </div>
+                <div class="style-control checkbox-control">
+                    <label>
+                        未落地文字淡色處理
+                        <input type="checkbox" id="viewer-fade-interim-input" checked>
+                    </label>
+                    <small class="setting-note">勾選：觀眾端的「組字中」與「語音未落地」文字以淡色顯示。取消：全部以實色顯示。</small>
+                </div>
             </div>
 
             <div class="settings-actions" style="margin-top: 8px; margin-bottom: 50px;">
@@ -666,6 +687,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             const viewerBgColorInput = document.getElementById('viewer-bg-color-input');
             const viewerLineHeightInput = document.getElementById('viewer-line-height-input');
             const viewerForceScrollBottomInput = document.getElementById('viewer-force-scroll-bottom-input');
+            const viewerFadeInterimInput = document.getElementById('viewer-fade-interim-input');
 
             const darkModeToggle = document.getElementById('dark-mode-toggle');
             const settingsSaveBtn = document.getElementById('settings-save-btn');
@@ -686,6 +708,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             let userRequestedStop = false;
             let hasClearedSpeechHint = false;
             let isComposing = false;
+            let compositionAnchor = 0; // 組字開始時的插入位置（已落地文字座標），整段組字期間固定不變
             let lastEditActivityAt = Date.now();
             let pendingServerText = null;
             let deferredResyncTimer = null;
@@ -840,7 +863,10 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 if (isSpeechOwner()) return false;
                 if (isComposing) return true;
                 if (isManualTranscriptionMode()) return false;
-                if (isEditMode) return true;
+                // 僅在「房內有其他人正在語音辨識」時，編輯中才暫停套用落地，
+                // 以免語音內容蓋掉正在編修的文字；沒有語音進行時，多人協作應即時同步，
+                // 不可因為取得編輯焦點就停止接收對方更新（否則會變成隔很久才一次套用一大段）。
+                if (isEditMode && localState && localState.speech_user) return true;
                 return false;
             }
 
@@ -1228,7 +1254,8 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     fontWeight: viewerFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
                     color: viewerFontColorInput.value,
                     backgroundColor: viewerBgColorInput.value,
-                    forceScrollBottom: viewerForceScrollBottomInput.checked
+                    forceScrollBottom: viewerForceScrollBottomInput.checked,
+                    fadeInterim: viewerFadeInterimInput.checked
                 };
                 localStorage.setItem('viewerEditorSettings', JSON.stringify(settings));
                 
@@ -1307,6 +1334,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 viewerFontColorInput.value = settings.color || '#FFFFFF';
                 viewerBgColorInput.value = settings.backgroundColor || '#000000';
                 viewerForceScrollBottomInput.checked = Boolean(settings.forceScrollBottom);
+                viewerFadeInterimInput.checked = settings.fadeInterim !== false; // 預設勾選（未提供時視為 true）
             }
 
             function importSettingsFromJson(jsonText) {
@@ -1356,7 +1384,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             });
 
             // Viewer settings logic remains unchanged, as it doesn't need to apply locally.
-            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput, viewerForceScrollBottomInput].forEach(el => {
+            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput, viewerForceScrollBottomInput, viewerFadeInterimInput].forEach(el => {
                 el.addEventListener('input', saveViewerSettings);
             });
 
@@ -1623,25 +1651,26 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             function updateSpeechLockUI(speechUser) {
                 const isManualMode = isManualTranscriptionMode();
                 const isLocked = speechUser && speechUser !== socket.id;
-                
-                
 
-                speechToggleBtn.disabled = isManualMode || isLocked;
-                directorSpeechBreakMode.disabled = isManualMode || isLocked;
+                // 自己正在錄音時，停止鍵與段落模式一定要可操作：
+                // 避免 reconnect 後 socket.id 變動，localState.speech_user 還是舊 id 被誤判為「他人佔用」而停不下來。
+                speechToggleBtn.disabled = (isManualMode || isLocked) && !isRecording;
+                directorSpeechBreakMode.disabled = (isManualMode || isLocked) && !isRecording;
 
+                if (isRecording) {
+                    speechToggleBtn.textContent = '停止語音識別';
+                    speechToggleBtn.classList.add('recording');
+                    return;
+                }
                 if (isManualMode) {
                     speechToggleBtn.textContent = '人工聽打模式';
-                    if (!isRecording) {
-                        speechToggleBtn.classList.remove('recording');
-                    }
+                    speechToggleBtn.classList.remove('recording');
                 } else if (isLocked) {
                     speechToggleBtn.textContent = '語音轉錄佔用';
-                    speechToggleBtn.classList.add('recording'); 
+                    speechToggleBtn.classList.add('recording');
                 } else {
-                    if (!isRecording) {
-                        speechToggleBtn.textContent = '開始語音識別';
-                        speechToggleBtn.classList.remove('recording');
-                    }
+                    speechToggleBtn.textContent = '開始語音識別';
+                    speechToggleBtn.classList.remove('recording');
                 }
             }
 
@@ -1784,13 +1813,17 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 handleManualPatchSentWithPendingServerText(sendEditorPatchUpdate());
             }
 
-            // 人工聽打模式：把「組字中（尚未落地）」的文字即時廣播給其他端，
-            // 讓共筆者／觀眾以淡色暫存先看到；自己的 textarea 已即時呈現組字內容，
-            // 故以 include_self=False 廣播（伺服器端處理），本端不顯示在浮動暫存區。
-            function broadcastCompositionInterim(text) {
-                if (!isManualTranscriptionMode()) return;
+            // 把「組字中（尚未落地）」的文字即時廣播給其他端，讓共筆者／觀眾以淡色暫存先看到；
+            // 自己的 textarea 已即時呈現組字內容，故以 include_self=False 廣播（伺服器端處理），本端不顯示在浮動暫存區。
+            // 有人正在語音辨識時不送（避免與語音 interim 互搶同一暫存區）；其餘情況（人工聽打、或一般協作且無人語音）都送。
+            function broadcastCompositionInterim(text, anchor) {
+                if (localState && localState.speech_user) return;
                 try {
-                    socket.emit('composition_interim', { room: ROOM_ID, text: String(text || '') });
+                    socket.emit('composition_interim', {
+                        room: ROOM_ID,
+                        text: String(text || ''),
+                        anchor: Math.max(0, anchor || 0)
+                    });
                 } catch (e) {}
             }
 
@@ -1807,6 +1840,9 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
 
 	            editor.addEventListener('compositionstart', () => {
 	                isComposing = true;
+                    // 在「尚未插入任何組字字元」的此刻記錄插入點＝正確 anchor（已落地文字座標）。
+                    // 不可在 compositionupdate 用 selectionStart 推算：不同 IME 會落在組字頭或尾，導致位置偏移。
+                    compositionAnchor = editor.selectionStart || 0;
                     markEditActivity();
 	                if (isEditMode) resetEditAutoExitTimer();
 	            });
@@ -1814,7 +1850,8 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 editor.addEventListener('compositionupdate', (e) => {
                     markEditActivity();
                     if (isEditMode) resetEditAutoExitTimer();
-                    broadcastCompositionInterim(e.data);
+                    // 用 compositionstart 記錄的固定插入點，不用組字中的 selectionStart（會因 IME 不同而偏移）。
+                    broadcastCompositionInterim(String(e.data || ''), compositionAnchor);
                 });
 
 	            editor.addEventListener('compositionend', () => {
@@ -1834,6 +1871,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     }
 	                flushPendingServerText();
                     sendEditorPatchUpdate();
+                    broadcastCompositionInterim('');
 	                if (isEditMode) resetEditAutoExitTimer();
 	            });
 
@@ -2472,15 +2510,12 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
 				if (!recognition) return;
                 if (!isRecording && localState?.speech_user !== socket.id) return;
 
+                // 使用者按下停止：先設旗標避免停止過程中 onend 又自動重啟；
+                // 不論伺服器鎖是否對得上（reconnect/sid 變動會對不上），本機辨識都一定要停，不可中途 return。
+                userRequestedStop = true;
                 const stopAck = await requestSpeechStopLock();
-                if (!stopAck.stopped) {
-                    if (!isManualTranscriptionMode()) {
-                        updateSpeechLockUI(stopAck.speech_user || (localState && localState.speech_user));
-                        return;
-                    }
-                }
                 if (localState) {
-                    localState.speech_user = stopAck.speech_user || null;
+                    localState.speech_user = stopAck.stopped ? null : (stopAck.speech_user || null);
                 }
                 updateSpeechLockUI(localState?.speech_user || null);
 				userRequestedStop = true;
@@ -2699,6 +2734,52 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     remoteCursors[data.id].selectionEl.remove();
                     delete remoteCursors[data.id];
                 }
+                if (data.id && remoteCompositions[data.id]) {
+                    remoteCompositions[data.id].el.remove();
+                    delete remoteCompositions[data.id];
+                }
+            });
+
+            // --- 遠端組字 overlay（v2）：在其他編修端，於遠端作者的插入位置疊一層淡色組字 ---
+            const remoteCompositions = {}; // { id: { el, text, anchor } }
+
+            function renderRemoteCompositions() {
+                if (!remoteCursorsOverlay) return;
+                const len = editor.value.length;
+                Object.values(remoteCompositions).forEach((c) => {
+                    if (!c.text) { c.el.style.display = 'none'; return; }
+                    const pos = Math.max(0, Math.min(c.anchor || 0, len));
+                    // 落地瞬間防重影：若 textarea 在 anchor 處已含這段組字（patch 已到、clear 還沒到），就先隱藏 overlay。
+                    if (editor.value.substr(pos, c.text.length) === c.text) { c.el.style.display = 'none'; return; }
+                    const coords = textMetrics.getCoords(pos);
+                    if (!coords) { c.el.style.display = 'none'; return; }
+                    c.el.style.display = 'block';
+                    c.el.style.top = `${coords.top - editor.scrollTop}px`;
+                    c.el.style.left = `${coords.left - editor.scrollLeft}px`;
+                    c.el.style.fontFamily = editor.style.fontFamily;
+                    c.el.style.fontSize = editor.style.fontSize;
+                    c.el.style.lineHeight = editor.style.lineHeight;
+                    c.el.textContent = c.text;
+                });
+            }
+
+            socket.on('composition_update', (data) => {
+                if (!data || !data.id || data.id === socket.id) return;
+                const text = String(data.text || '');
+                if (!text) {
+                    const c = remoteCompositions[data.id];
+                    if (c) { c.el.remove(); delete remoteCompositions[data.id]; }
+                    return;
+                }
+                if (!remoteCompositions[data.id]) {
+                    const el = document.createElement('div');
+                    el.className = 'remote-composition';
+                    remoteCursorsOverlay.appendChild(el);
+                    remoteCompositions[data.id] = { el };
+                }
+                remoteCompositions[data.id].text = text;
+                remoteCompositions[data.id].anchor = Number(data.anchor) || 0;
+                renderRemoteCompositions();
             });
 
             // --- 4. Enhanced event listeners for syncing and rendering ---
@@ -2719,11 +2800,12 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             });
 
             // Re-render on scroll, resize, and font changes
-            editor.addEventListener('scroll', renderRemoteCursors);
+            editor.addEventListener('scroll', () => { renderRemoteCursors(); renderRemoteCompositions(); });
             window.addEventListener('resize', () => {
                 textMetrics.sync();
                 syncInterimTailLayout();
                 renderRemoteCursors();
+                renderRemoteCompositions();
             });
             // When director settings change, resync styles and render
             [directorFontFamilySelect, directorFontSizeInput, directorLineHeightInput].forEach(el => {
@@ -2731,6 +2813,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     setTimeout(() => { // Wait for styles to apply
                         textMetrics.sync();
                         renderRemoteCursors();
+                        renderRemoteCompositions();
                     }, 0);
                 });
             });
@@ -2740,13 +2823,13 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             socket.off('state_update');
             socket.on('state_update', (data) => {
                 originalStateUpdateHandler(data);
-                Promise.resolve().then(renderRemoteCursors);
+                Promise.resolve().then(() => { renderRemoteCursors(); renderRemoteCompositions(); });
             });
             const originalPatchHandler = socket._callbacks['$script_patched'][0];
             socket.off('script_patched');
             socket.on('script_patched', (data) => {
                 originalPatchHandler(data);
-                Promise.resolve().then(renderRemoteCursors);
+                Promise.resolve().then(() => { renderRemoteCursors(); renderRemoteCompositions(); });
             });
         });
     </script>

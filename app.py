@@ -45,31 +45,41 @@ class ScriptManager:
     """每個「房間」都會有一個獨立的 ScriptManager 實例。"""
     def __init__(self):
         # 初始文本 (已更新為純文字版使用指引)
-        self.raw_text = """========================================
-   歡迎使用 - 協作語音字幕編輯器（新版）
-========================================
+        self.raw_text = """════════════════════════════════════
+  協作聽打字幕工具 — 快速上手
+════════════════════════════════════
 
-[1] 語音辨識規則
-    - 同一房間同時間只允許一位導播啟動語音辨識。
-    - 啟動後，未落地文字會在底部浮動區顯示；確認落地後才寫入文本區。
-    - 「連續 / 換行 / 空行」段落模式可在辨識中即時切換。
-    - 語音辨識進行中，僅辨識端可調整段落模式；其他端會同步顯示目前模式。
+這是一個多人即時協作的聽打／字幕工具：你在這裡輸入文字，
+觀眾端就能同步看到字幕。
 
-[2] 協作編修規則
-    - 點入文本區即進入「編輯模式」，此端會暫停套用新的落地同步。
-    - 編修完成請按 Esc 跳出編輯模式；若閒置 3 秒未動作也會自動退出編輯，並恢復同步最新內容。
-    - 若超過「自動跳出編輯區秒數」無動作，系統會自動跳出編輯模式。
-    - 此秒數設定為全房共享，任一端調整後全員立即生效。
+──【1】先選協作模式（右側設定面板）──
+• 人機合作模式：可用「語音轉錄」把語音自動轉成文字，也能多人一起編修。
+• 人工聽打模式：純人工打字、停用語音；適合多人同時聽打，打字時不會被自動打斷。
 
-[3] 其他功能
-    - 右上可分享觀眾連結與 QR Code。
-    - 左側可用常用片段（Ctrl + 數字）快速插入。
-    - 支援匯入 / 匯出 .txt 與 Ctrl+H 批次取代。
+──【2】語音轉錄（人機合作模式）──
+• 建議用 Edge 瀏覽器，辨識較準。
+• 同一房間同時只能一人啟動語音；辨識中的字會先以暫存顯示，確認後才落地成正式文字。
+• 可即時切換段落模式：連續 / 換行 / 空行。
 
-----------------------------------------
-請直接開始說話或編輯，祝使用順利。
+──【3】多人即時協作──
+• 沒有人在用語音時，大家一起打字會「即時同步」，
+  還能即時看到對方正在輸入（包含注音／拼音的組字過程）。
+• 人機合作模式下若有人正在語音：點進文字區會暫停同步、避免被語音內容蓋掉；
+  編修完按 Esc，或停手幾秒會自動退出並恢復同步。
 
-小彩蛋：請點擊右上角作者的名字看看會發生什麼事!"""
+──【4】分享給觀眾──
+• 點右上「分享觀眾」取得觀眾連結與 QR Code。
+• 觀眾端可在設定切換「未落地文字淡色處理」，決定組字／未落地文字要淡色或實色。
+
+──【5】其他好用功能──
+• 左側「常用片段」：用 Ctrl + 數字快速插入。
+• 匯入 / 匯出 .txt 純文字檔。
+• Ctrl + H 批次尋找取代。
+
+────────────────────────────────────
+直接開始說話或打字吧，祝使用順利！
+
+小彩蛋：請點擊右上角作者的名字，看看會發生什麼事！"""
         self.quick_inputs = {str(i): '' for i in range(1, 11)}
         # 樣式設定（拆分為導播端與觀眾端）
         self.director_settings = {
@@ -94,7 +104,8 @@ class ScriptManager:
             'color': '#FFFFFF',
             'backgroundColor': '#000000',
             'theme': 'dark',
-            'forceScrollBottom': False
+            'forceScrollBottom': False,
+            'fadeInterim': True
         }
         self.speech_user = None
         self.interim_text = ''
@@ -153,6 +164,12 @@ class ScriptManager:
                 self.viewer_settings['forceScrollBottom'] = value.lower() in {'1', 'true', 'yes', 'on'}
             else:
                 self.viewer_settings['forceScrollBottom'] = bool(value)
+        if 'fadeInterim' in new_settings:
+            value = new_settings['fadeInterim']
+            if isinstance(value, str):
+                self.viewer_settings['fadeInterim'] = value.lower() in {'1', 'true', 'yes', 'on'}
+            else:
+                self.viewer_settings['fadeInterim'] = bool(value)
 
     def patch_script(self, patch_text):
         try:
@@ -449,20 +466,28 @@ def handle_interim_text(data):
 
 @socketio.on('composition_interim')
 def handle_composition_interim(data):
-    """人工聽打模式：把編修端「組字中（尚未落地）」的文字即時轉發給其他端做淡色預覽。"""
+    """把編修端「組字中（尚未落地）」的文字＋插入位置(anchor)即時轉發給其他端，
+    供觀眾端 inline、編修端 overlay 在正確位置顯示淡色組字（無人語音時，含一般協作）。"""
     room_id = data.get('room')
     if not is_room_director(room_id, request.sid):
         return
     manager = get_room_manager(room_id)
     if not manager:
         return
-    # 僅限人工聽打模式，避免與語音 interim 互相干擾。
-    if manager.director_settings.get('collaborationMode') != 'manual_transcription':
+    # 有人正在語音辨識時不轉發組字預覽（避免與語音 interim 互相干擾）；
+    # 其餘情況（人工聽打、或一般協作且無人語音）都轉發。
+    if manager.speech_user:
         return
     text = str(data.get('text', ''))
-    # 刻意不寫入 manager.interim_text：避免作者自身 resync 時把自己的組字字重複顯示在浮動區。
-    # 以 include_self=False 轉發，作者本端的 textarea 已即時呈現組字內容。
-    emit('interim_update', { 'text': text }, to=room_id, include_self=False)
+    try:
+        anchor = int(data.get('anchor', 0))
+    except (TypeError, ValueError):
+        anchor = 0
+    if anchor < 0:
+        anchor = 0
+    # 帶上作者 sid，讓接收端可依作者分別定位/清除；以 include_self=False 轉發。
+    # 不寫入 manager.interim_text（組字為暫態、且避免作者自身 resync 時重複顯示）。
+    emit('composition_update', { 'id': request.sid, 'text': text, 'anchor': anchor }, to=room_id, include_self=False)
     update_last_active(room_id)
 
 @socketio.on('request_speech_start')

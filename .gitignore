@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+.tmp_*.js
+
+*.mp4
+
+.env
+.env.*
+
+*.log
+
+# 本機備份與草稿（保留在本機，不進 repo）
+flyio-backups/
+code-backups/
+advice.txt
+install.ps1
