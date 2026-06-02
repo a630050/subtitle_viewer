@@ -13,9 +13,9 @@
         .top-bar h3 { font-size: 1.5em; margin: 0; }
         .file-buttons { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .file-buttons button, .file-buttons select { padding: 4px 8px; font-size: 14px; cursor: pointer; background-color: #fff; border: 1px solid #ccc; border-radius: 4px; }
-		.file-buttons .share-btn { background-color: #0d6efd; color: #fff; border-color: #0d6efd; }
-		.file-buttons .share-btn:hover { background-color: #0b5ed7; border-color: #0a58ca; }
-		body.dark-mode .file-buttons .share-btn { background-color: #375a7f; border-color: #375a7f; }
+.file-buttons .share-btn { background-color: #0d6efd; color: #fff; border-color: #0d6efd; }
+.file-buttons .share-btn:hover { background-color: #0b5ed7; border-color: #0a58ca; }
+body.dark-mode .file-buttons .share-btn { background-color: #375a7f; border-color: #375a7f; }
 		.file-buttons .speech-btn { background-color: #4CAF50; color: white; border: none; transition: background-color 0.3s; }
 		.file-buttons .speech-btn.recording { background-color: #f44336; }
         .editor-wrapper { position: relative; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; background-color: #fff; }
@@ -33,6 +33,27 @@
             color: #000;
             transition: background-color 0.3s, color 0.3s;
         }
+        #interim-tail {
+            position: absolute;
+            left: 36px;
+            right: 72px;
+            bottom: 16px;
+            z-index: 4;
+            display: none;
+            pointer-events: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: monospace;
+            font-size: 24px;
+            line-height: 1.2;
+            color: rgba(0, 0, 0, 0.55);
+        }
+        #interim-tail.visible {
+            display: block;
+        }
+        #interim-tail.holding-space {
+            visibility: hidden;
+        }
         #status { position: fixed; bottom: 10px; right: 10px; background-color: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 5px; font-size: 14px; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .modal-content { background-color: #fff; padding: 20px; border-radius: 5px; text-align: center; color: #333; }
@@ -45,6 +66,32 @@
         .style-control { margin-bottom: 15px; }
         .style-control label { display: block; margin-bottom: 5px; font-size: 14px; color: #333; }
         .style-control input, .style-control select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .style-control.checkbox-control label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+        .style-control.checkbox-control input[type="checkbox"] {
+            width: auto;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+        }
+        .setting-tip {
+            margin-left: 6px;
+            color: #2b7de9;
+            cursor: help;
+            font-weight: 700;
+        }
+        .setting-note {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #555;
+        }
 /* 美化顏色選取器 */
 .style-control input[type="color"] {
   -webkit-appearance: none;
@@ -81,6 +128,9 @@ body.dark-mode .settings-actions button { background-color: #3a3a3a; color: #e0e
 body.dark-mode .style-control input[type="color"] {
   background-color: #2c2c2c;
   border-color: #555;
+}
+body.dark-mode .setting-note {
+  color: #b7b7b7;
 }
 body.dark-mode .style-control input[type="color"]::-webkit-color-swatch {
   border-color: rgba(255,255,255,0.25);
@@ -130,6 +180,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
         body.dark-mode .style-control input[type="color"] { border-width: 2px; }
         body.dark-mode .editor-wrapper { border-color: #444; }
         body.dark-mode #script-editor { background-color: #2c2c2c; color: #e0e0e0; }
+        body.dark-mode #interim-tail { color: rgba(255, 255, 255, 0.65); }
         body.dark-mode .modal-content { background-color: #3a3a3a; color: #e0e0e0; }
         body.dark-mode #dark-mode-toggle {
 			background-color: transparent;
@@ -254,6 +305,30 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
         body.dark-mode .snippet-item textarea { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
         body.dark-mode .snippet-item .snippet-insert-btn, body.dark-mode .snippets-actions button { background-color: #3a3a3a; color: #e0e0e0; border-color: #555; }
         body.dark-mode #snippets-toggle-btn { background-color: #3a3a3a; border-color: #555; }
+		
+        /* === IME Sandbox Overlay === */
+        #ime-sandbox {
+            position: absolute;
+            display: none; /* 由 JS 控制顯示 */
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid #0d6efd;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            padding: 2px 6px;
+            min-width: 100px;
+            z-index: 6; /* 需高於 textarea (z-index: 5) */
+            font-family: inherit; /* 繼承主編輯器的字體 */
+            font-size: inherit;
+            line-height: inherit;
+            color: #000;
+            outline: none;
+        }
+        body.dark-mode #ime-sandbox {
+            background-color: rgba(40, 40, 40, 0.95);
+            border-color: #82c0ff;
+            color: #e0e0e0;
+        }		
+		
 
         /* === Remote Cursors & Selections === */
         #remote-cursors-overlay {
@@ -264,22 +339,9 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             right: 0;
             bottom: 0;
             pointer-events: none;
-            z-index: 999;
+            z-index: 5;
             overflow: hidden; /* 確保游標不會畫到外面 */
         }
-		/* === Interim Overlay (灰字浮水印) === */
-		.interim-overlay {
-		  position: absolute;
-		  pointer-events: none;
-		  color: rgba(128, 128, 128, 0.6);
-		  font-style: italic;
-
-		  /* 新增：確保字體跟 textarea 一樣 */
-		  white-space: pre-wrap;
-		  word-wrap: break-word;
-		  width: 100%;
-		  box-sizing: border-box;
-		}
         .remote-cursor {
             position: absolute;
             width: 2px;
@@ -309,8 +371,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
     </style>
 </head>
 <body>
-    <!-- NOTE: 默認收折左右矢板，首次進入不佔用編輯區空間 -->
-    <div class="main-container snippets-collapsed settings-collapsed">
+    <div class="main-container settings-collapsed snippets-collapsed">
         <!-- 左側：片段面板（可收合） -->
         <div id="snippets-pane" class="snippets-pane" aria-label="片段插入面板">
             <div id="snippets-body">
@@ -329,9 +390,14 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     <div class="snippet-item"><label>0</label><textarea id="snippet-0" placeholder="Ctrl+0 插入"></textarea><button data-snippet="0" class="snippet-insert-btn">插入</button></div>
                 </div>
             </div>
-            <div class="snippets-actions">
-                <button id="snippets-clear-btn">清空全部片段</button>
+            <div class="snippets-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px;">
+                <button id="snippets-save-btn">儲存片語</button>
+                <button id="snippets-load-btn">載入片語</button>
             </div>
+            <div class="snippets-actions" style="margin-top: 8px;">
+                <button id="snippets-clear-btn" style="width: 100%;">清空全部片段</button>
+            </div>
+            <input id="snippets-file-input" type="file" accept="application/json" style="display:none" />
         </div>
         <div id="snippets-toggle-btn" tabindex="0" role="button" aria-controls="snippets-pane" aria-expanded="false" aria-label="展開片段">&raquo;</div>
         <div class="editor-pane">
@@ -354,9 +420,10 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 </div>
             </div>
             <div class="editor-wrapper">
-                <!-- === Remote Cursors & Selections Overlay === -->
                 <div id="remote-cursors-overlay"></div>
                 <textarea id="script-editor" placeholder="在此輸入或貼上文本..."></textarea>
+                <div id="interim-tail" aria-live="polite"></div>
+				<div id="ime-sandbox" contenteditable="true" style="display: none;"></div>
                 <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" title="捲動到底部">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </button>
@@ -366,6 +433,13 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             <div id="settings-body">
                 
                 <h4>編輯區設定</h4>
+                <div class="style-control">
+                    <label for="director-collaboration-mode">協作模式</label>
+                    <select id="director-collaboration-mode">
+                        <option value="human_ai" selected>人機合作模式</option>
+                        <option value="manual_transcription">人工聽打模式</option>
+                    </select>
+                </div>
 				<div class="style-control">
 					<label for="director-speech-break-mode">語音轉錄換行</label>
 					<select id="director-speech-break-mode">
@@ -374,6 +448,14 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
 						<option value="double-newline">空行模式</option>
 					</select>
 				</div>
+                <div class="style-control">
+                    <label for="editor-idle-seconds">
+                        自動跳出編輯區秒數
+                        <span class="setting-tip" title="人工編輯者進入編輯區會暫停落地文字同步，修改後請按 Esc 跳出；若閒置 3 秒未有鍵盤、滑鼠或組字更新，會自動退出編輯。">ⓘ</span>
+                    </label>
+                    <input type="number" id="editor-idle-seconds" min="1" max="60" step="1" value="3">
+                    <small class="setting-note">人工編輯者進入編輯區會暫停落地文字同步，修改後請按 Esc 跳出；若閒置 3 秒未動作，系統會自動退出編輯並恢復同步。</small>
+                </div>
                 <div class="style-control">
                     <label for="director-font-family-select">字體</label>
                     <select id="director-font-family-select">
@@ -420,7 +502,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 </div>
                 <div class="style-control">
                     <label for="viewer-font-size-input">字體大小 (px)</label>
-                    <input type="number" id="viewer-font-size-input" min="8" max="120" step="1" value="80">
+                    <input type="number" id="viewer-font-size-input" min="8" max="120" step="1" value="60">
                 </div>
                 <div class="style-control">
                     <label for="viewer-line-height-input">行距</label>
@@ -442,6 +524,12 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     <label for="viewer-bg-color-input">背景顏色</label>
                     <input type="color" id="viewer-bg-color-input" value="#000000">
                 </div>
+                <div class="style-control checkbox-control">
+                    <label>
+                        觀眾端強制捲動置底
+                        <input type="checkbox" id="viewer-force-scroll-bottom-input">
+                    </label>
+                </div>
             </div>
 
             <div class="settings-actions" style="margin-top: 8px; margin-bottom: 50px;">
@@ -451,7 +539,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             </div>
         </div>
 
-        <!-- NOTE: 按鈕定位在主容器上，具可鍵盤操作與ARIA說明 -->
+        <!-- 按鈕：定位在主容器上，具可鍵盤操作與ARIA說明 -->
         <div id="pane-toggle-btn" tabindex="0" role="button" aria-controls="settings-pane" aria-expanded="false" aria-label="展開設定">&laquo;</div>
     </div>
 
@@ -465,8 +553,8 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             <div style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 4px; font-size: 14px; color: #666; text-align: left;">
                 <strong>智能載入：</strong><br>
                 • 自動移除空白行<br>
-                • 將長句按標點符號分割（每行最多20字）<br>
-                • 優先在逗號、句號、問號、驚嘆號等標點處分行<br>
+                • 將長句按標点符號分割（每行最多20字）<br>
+                • 優先在逗號、句號、問號、驚嘆號等標点處分行<br>
                 <br>
                 <strong>原文載入：</strong>保持原始格式，不做任何修改
             </div>
@@ -515,7 +603,6 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
     </div>
     <input type="file" id="file-input" accept=".txt">
 
-    <!-- === 引入外部函式庫 === -->
     <script src="https://cdn.jsdelivr.net/gh/google/diff-match-patch@master/javascript/diff_match_patch.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -526,8 +613,15 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
 
             // Editor and Collaboration Elements
             const editor = document.getElementById('script-editor');
+            const interimTail = document.getElementById('interim-tail');
             const statusDiv = document.getElementById('status');
             const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+			
+			// === 新增：IME 沙箱相關元素與狀態 ===
+            const imeSandbox = document.getElementById('ime-sandbox');
+            let isSandboxActive = false;
+            let sandboxAnchorPosition = 0;
+            let isEditMode = false;
             
             // File & Control Buttons
             const clearBtn = document.getElementById('clear-btn');
@@ -561,7 +655,9 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             const directorFontColorInput = document.getElementById('director-font-color-input');
             const directorBgColorInput = document.getElementById('director-bg-color-input');
             const directorLineHeightInput = document.getElementById('director-line-height-input');
+            const directorCollaborationModeSelect = document.getElementById('director-collaboration-mode');
 			const directorSpeechBreakMode = document.getElementById('director-speech-break-mode');
+            const editorIdleSecondsInput = document.getElementById('editor-idle-seconds');
             // --- Viewer Style Settings Elements ---
             const viewerFontFamilySelect = document.getElementById('viewer-font-family-select');
             const viewerFontSizeInput = document.getElementById('viewer-font-size-input');
@@ -569,6 +665,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             const viewerFontColorInput = document.getElementById('viewer-font-color-input');
             const viewerBgColorInput = document.getElementById('viewer-bg-color-input');
             const viewerLineHeightInput = document.getElementById('viewer-line-height-input');
+            const viewerForceScrollBottomInput = document.getElementById('viewer-force-scroll-bottom-input');
 
             const darkModeToggle = document.getElementById('dark-mode-toggle');
             const settingsSaveBtn = document.getElementById('settings-save-btn');
@@ -583,38 +680,433 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             let importedFileContent = '';
             let latency = 0;
             let connectionCounts = null;
+            let latestInterimText = '';
+            let recognition = null;
+            let isRecording = false;
+            let userRequestedStop = false;
+            let hasClearedSpeechHint = false;
+            let isComposing = false;
+            let lastEditActivityAt = Date.now();
+            let pendingServerText = null;
+            let deferredResyncTimer = null;
+            let editAutoExitTimer = null;
+            let shouldAutoScrollEditor = true;
+            const editorPaddingBottomBase = parseFloat(window.getComputedStyle(editor).paddingBottom) || 14;
+            const INTERIM_COLLAPSE_MAX_HOLD_MS = 1800;
+            let interimCollapseTimer = null;
+            let interimTailHoldHeightPx = 0;
+            let isHoldingInterimTailSpace = false;
 
             // --- Auto-scroll Logic ---
             function isScrolledToBottom(el) {
-                const threshold = 5; // 像素容錯值
-                return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+                // 嚴格判定：除非使用者主動上滑超過 0.8 頁的高度，否則都會自動置底
+                const threshold = Math.max(150, el.clientHeight * 0.8);
+                return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
             }
 
+            let isProgrammaticScrollEditor = false;
             function scrollToBottom(el) {
+                isProgrammaticScrollEditor = true;
                 el.scrollTop = el.scrollHeight;
+                setTimeout(() => { isProgrammaticScrollEditor = false; }, 50);
             }
 
             function handleEditorScroll() {
-                if (isScrolledToBottom(editor)) {
+                if (isProgrammaticScrollEditor) return;
+                const atBottom = isScrolledToBottom(editor);
+                shouldAutoScrollEditor = atBottom;
+                if (atBottom) {
                     scrollToBottomBtn.classList.remove('visible');
                 } else {
                     scrollToBottomBtn.classList.add('visible');
                 }
             }
-            
+
+            function isSpeechOwner() {
+                return Boolean(localState && localState.speech_user && localState.speech_user === socket.id);
+            }
+
+            function isManualTranscriptionMode() {
+                return directorCollaborationModeSelect?.value === 'manual_transcription';
+            }
+             
             function wrapUpdateFunction(updateFn) {
                 return function(...args) {
-                    const shouldScroll = isScrolledToBottom(editor);
-                    updateFn(...args);
-                    if (shouldScroll) {
-                        setTimeout(() => scrollToBottom(editor), 0);
+                    const manualMode = isManualTranscriptionMode();
+                    if (!manualMode && isScrolledToBottom(editor)) {
+                        shouldAutoScrollEditor = true;
                     }
+                    const savedScrollTop = editor.scrollTop;
+                    const wasAutoScroll = !manualMode && shouldAutoScrollEditor;
+                    updateFn(...args);
+                    if (!isManualTranscriptionMode() && wasAutoScroll) {
+                        scrollToBottom(editor);
+                        setTimeout(() => { if (shouldAutoScrollEditor) scrollToBottom(editor); handleEditorScroll(); }, 10);
+                        setTimeout(() => { if (shouldAutoScrollEditor) scrollToBottom(editor); handleEditorScroll(); }, 100);
+                    } else {
+                        editor.scrollTop = savedScrollTop;
+                        handleEditorScroll();
+                    }
+                }
+            }
+
+            function clearInterimCollapseTimer() {
+                if (!interimCollapseTimer) return;
+                clearTimeout(interimCollapseTimer);
+                interimCollapseTimer = null;
+            }
+
+            function getInterimTailHeightPx() {
+                return Math.ceil(interimTail.getBoundingClientRect().height || 0);
+            }
+
+            function releaseInterimTailHoldSpace() {
+                clearInterimCollapseTimer();
+                isHoldingInterimTailSpace = false;
+                interimTail.textContent = '';
+                interimTail.style.minHeight = '';
+                interimTail.classList.remove('holding-space');
+                interimTail.classList.remove('visible');
+                syncInterimTailLayout();
+            }
+
+            function holdInterimTailSpace() {
+                const measuredHeight = getInterimTailHeightPx();
+                if (measuredHeight > 0) {
+                    interimTailHoldHeightPx = measuredHeight;
+                }
+                if (interimTailHoldHeightPx <= 0) {
+                    releaseInterimTailHoldSpace();
+                    return;
+                }
+                isHoldingInterimTailSpace = true;
+                interimTail.textContent = '\u00A0';
+                interimTail.style.minHeight = `${interimTailHoldHeightPx}px`;
+                interimTail.classList.add('visible');
+                interimTail.classList.add('holding-space');
+                syncInterimTailLayout();
+                clearInterimCollapseTimer();
+                interimCollapseTimer = setTimeout(() => {
+                    releaseInterimTailHoldSpace();
+                    if (shouldAutoScrollEditor) scrollToBottom(editor);
+                }, INTERIM_COLLAPSE_MAX_HOLD_MS);
+            }
+
+            function notifyMainTextUpdated() {
+                if (isHoldingInterimTailSpace) {
+                    releaseInterimTailHoldSpace();
+                }
+            }
+
+            function renderInterimTail() {
+                const text = String(latestInterimText || '');
+                if (!text.trim()) {
+                    const shouldHoldSpace = isHoldingInterimTailSpace || interimTail.classList.contains('visible');
+                    if (shouldHoldSpace) {
+                        holdInterimTailSpace();
+                    } else {
+                        releaseInterimTailHoldSpace();
+                    }
+                    return;
+                }
+                clearInterimCollapseTimer();
+                isHoldingInterimTailSpace = false;
+                interimTail.textContent = text;
+                interimTail.style.minHeight = '';
+                interimTail.classList.add('visible');
+                interimTail.classList.remove('holding-space');
+                syncInterimTailLayout();
+                interimTailHoldHeightPx = getInterimTailHeightPx();
+                if (shouldAutoScrollEditor) {
+                    scrollToBottom(editor);
                     handleEditorScroll();
                 }
             }
 
+            function syncInterimTailLayout() {
+                const tailHeight = interimTail.classList.contains('visible')
+                    ? Math.ceil(interimTail.getBoundingClientRect().height)
+                    : 0;
+                const extraBottomPadding = tailHeight > 0 ? tailHeight + 12 : 0;
+                editor.style.paddingBottom = `${editorPaddingBottomBase + extraBottomPadding}px`;
+            }
+
+            function setInterimTailText(text) {
+                latestInterimText = String(text || '');
+                renderInterimTail();
+            }
+
+            function shouldDeferServerApply() {
+                if (isSpeechOwner()) return false;
+                if (isComposing) return true;
+                if (isManualTranscriptionMode()) return false;
+                if (isEditMode) return true;
+                return false;
+            }
+
+            function getEditIdleSeconds() {
+                const raw = Number.parseInt(editorIdleSecondsInput?.value ?? '3', 10);
+                if (!Number.isFinite(raw)) return 3;
+                return Math.min(60, Math.max(1, raw));
+            }
+
+            function markEditActivity() {
+                lastEditActivityAt = Date.now();
+            }
+
+            function resetEditAutoExitTimer() {
+                if (editAutoExitTimer) {
+                    clearTimeout(editAutoExitTimer);
+                    editAutoExitTimer = null;
+                }
+                if (!isEditMode) return;
+                if (isManualTranscriptionMode()) return;
+                const timeoutMs = getEditIdleSeconds() * 1000;
+                editAutoExitTimer = setTimeout(() => {
+                    editAutoExitTimer = null;
+                    if (!isEditMode) return;
+                    if (isManualTranscriptionMode()) return;
+                    if (isComposing || (Date.now() - lastEditActivityAt) < 180) {
+                        resetEditAutoExitTimer();
+                        return;
+                    }
+                    if (document.activeElement === editor) {
+                        editor.blur();
+                    } else {
+                        setEditMode(false);
+                    }
+                }, timeoutMs);
+            }
+
+            function setEditMode(active) {
+                if (isSpeechOwner()) {
+                    if (editAutoExitTimer) {
+                        clearTimeout(editAutoExitTimer);
+                        editAutoExitTimer = null;
+                    }
+                    isEditMode = false;
+                    return;
+                }
+                if (active) {
+                    isEditMode = true;
+                    markEditActivity();
+                    resetEditAutoExitTimer();
+                    return;
+                }
+                if (!isEditMode) return;
+                isEditMode = false;
+                if (editAutoExitTimer) {
+                    clearTimeout(editAutoExitTimer);
+                    editAutoExitTimer = null;
+                }
+                flushPendingServerText();
+                if (socket.connected) {
+                    socket.emit('join', { room: ROOM_ID, role: 'director' });
+                }
+            }
+
+            function scheduleFullStateResync(delayMs = 200) {
+                if (deferredResyncTimer) return;
+                deferredResyncTimer = setTimeout(function fireResync() {
+                    // 組字途中先不空跑 join（取回的狀態仍會被延後），改為原地重排，
+                    // 待組字結束後再送出一次，避免長組字期間每隔 delayMs 就打一輪 join。
+                    if (socket.connected && isComposing) {
+                        deferredResyncTimer = setTimeout(fireResync, delayMs);
+                        return;
+                    }
+                    deferredResyncTimer = null;
+                    if (socket.connected) {
+                        socket.emit('join', { room: ROOM_ID, role: 'director' });
+                    }
+                }, delayMs);
+            }
+
+            function applyServerText(newText) {
+                // 套用伺服器文本前，先補送本機尚未送出的 debounce patch，
+                // 避免 manual 模式 debounce 視窗內的按鍵被全量 state_update 覆蓋而遺失。
+                if (patchUpdateTimeout) {
+                    clearTimeout(patchUpdateTimeout);
+                    patchUpdateTimeout = null;
+                    sendEditorPatchUpdate();
+                }
+                const incoming = String(newText || '');
+                if (editor.value === incoming) {
+                    lastSentText = incoming;
+                    notifyMainTextUpdated();
+                    return;
+                }
+                const oldText = editor.value;
+                const oldCursorPos = editor.selectionStart || 0;
+                editor.value = incoming;
+                lastSentText = incoming;
+                if (document.activeElement === editor) {
+                    try {
+                        const diffs = dmp.diff_main(oldText, incoming);
+                        const newCursorPos = dmp.diff_xIndex(diffs, oldCursorPos);
+                        editor.selectionStart = editor.selectionEnd = Math.min(newCursorPos, editor.value.length);
+                    } catch (e) {
+                        editor.selectionStart = editor.selectionEnd = Math.min(oldCursorPos, editor.value.length);
+                    }
+                }
+                notifyMainTextUpdated();
+            }
+
+            function applyOrQueueServerText(newText) {
+                if (shouldDeferServerApply()) {
+                    pendingServerText = String(newText || '');
+                    return;
+                }
+                applyServerText(newText);
+            }
+
+            function flushPendingServerText() {
+                if (pendingServerText == null) return;
+                if (shouldDeferServerApply()) return;
+                const text = pendingServerText;
+                pendingServerText = null;
+                applyServerText(text);
+            }
+			
+            // === 新增：IME 沙箱核心輔助函式 ===
+
+            // 顯示並定位沙箱
+            function showSandbox() {
+                if (true) return;
+
+                // 1. 記錄當前游標位置作為插入點
+                sandboxAnchorPosition = editor.selectionStart;
+
+                // 2. 使用 textMetrics 計算游標的畫面座標
+                const coords = textMetrics.getCoords(sandboxAnchorPosition);
+                if (!coords) return;
+
+                // 3. 定位沙箱
+                //    - 將沙箱定位在游標所在行的正下方 (右下方)
+                imeSandbox.style.top = `${coords.top + coords.height - editor.scrollTop + 2}px`; // top + height 將其推到下一行，+2px 是微小的間距
+                imeSandbox.style.left = `${coords.left - editor.scrollLeft}px`;
+
+                // 4. 複製主編輯器的字體樣式
+                imeSandbox.style.fontSize = editor.style.fontSize;
+                imeSandbox.style.fontFamily = editor.style.fontFamily;
+                imeSandbox.style.lineHeight = editor.style.lineHeight;
+
+                // 5. 顯示沙箱並設定狀態
+                imeSandbox.style.display = 'block';
+                isSandboxActive = true;
+                imeSandbox.focus();
+            }
+
+            // 隱藏並重設沙箱
+            function hideSandbox(shouldFocusEditor = true) {
+                if (!isSandboxActive) return;
+
+                imeSandbox.textContent = '';
+                imeSandbox.style.display = 'none';
+                isSandboxActive = false;
+                
+                if (shouldFocusEditor) {
+                    editor.focus();
+                    // 恢復游標到插入點
+                    try {
+                        editor.selectionStart = editor.selectionEnd = sandboxAnchorPosition;
+                    } catch (e) {}
+                }
+                setTimeout(flushPendingServerText, 0);
+            }
+            
+            // 提交沙箱內容到主編輯器
+            function commitSandboxText() {
+                if (!isSandboxActive) return;
+
+                const textToInsert = imeSandbox.textContent;
+                hideSandbox(false); // 先隱藏，避免焦點問題
+
+                if (textToInsert) {
+                    const currentText = editor.value;
+                    const before = currentText.substring(0, sandboxAnchorPosition);
+                    const after = currentText.substring(sandboxAnchorPosition);
+                    
+                    editor.value = before + textToInsert + after;
+                    
+                    // 更新游標位置
+                    const newCursorPos = sandboxAnchorPosition + textToInsert.length;
+                    editor.selectionStart = editor.selectionEnd = newCursorPos;
+
+                    // 觸發 input 事件，讓協作系統知道文本已變更
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+                editor.focus(); // 最後再將焦點移回主編輯器
+            }			
+
             // --- Style Settings Logic (Refactored) ---
+			            // --- 最終版：基於 beforeinput 的防禦性沙箱觸發器 ---
+            editor.addEventListener('beforeinput', (e) => {
+                // IME sandbox is deprecated; keep native textarea editing behavior.
+                return;
+                const nonTriggerInputTypes = new Set([
+                    'deleteContentBackward', 'deleteContentForward', 'deleteByCut',
+                    'historyUndo', 'historyRedo'
+                ]);
+
+                // 規則 1：在以下情況，應「放行」預設輸入行為，不觸發沙箱：
+                // - 沙箱已經是啟動狀態
+                // - 輸入類型不是打字或貼上 (例如：刪除、復原)
+                // - 語音功能「沒有」被任何人佔用
+                // - 語音功能被「自己」佔用 (即自己是說話者)
+                const isSpeechFree = !localState.speech_user || localState.speech_user === socket.id;
+                if (isSandboxActive || isSpeechFree || nonTriggerInputTypes.has(e.inputType)) {
+                    return;
+                }
+
+                // 規則 2：對於所有其他輸入意圖 (協作者在他人語音中進行打字、貼上等)...
+                
+                // 【核心修正】在事件發生前，立刻記錄下編輯器的原始狀態
+                const originalText = editor.value;
+                const selectionStart = editor.selectionStart;
+                const selectionEnd = editor.selectionEnd;
+
+                // 阻止預設行為
+                e.preventDefault();
+
+                // 使用 setTimeout 將我們的操作推遲到瀏覽器內部處理之後
+                setTimeout(() => {
+                    // 【防禦性檢查】檢查是否有字元「洩漏」進了編輯器
+                    if (editor.value !== originalText) {
+                        // 如果有，強制將編輯器恢復到事件發生前的狀態
+                        editor.value = originalText;
+                        editor.setSelectionRange(selectionStart, selectionEnd);
+                    }
+
+                    // 現在，在一個絕對乾淨的狀態下，啟動沙箱
+                    if (!isSandboxActive) {
+                        showSandbox(); // 顯示沙箱並轉移焦點
+
+                        // 將被攔截的初始數據 (e.data) 填入沙箱，
+                        // 無論是單個字元還是貼上的文本，都能正確處理
+                        if (e.data) {
+                            // 使用 document.execCommand 來處理插入，這對 contenteditable 元素更穩定
+                            imeSandbox.focus(); // 確保焦點在沙箱上
+                            document.execCommand('insertText', false, e.data);
+                        }
+                    }
+                }, 0);
+            });
+
             document.addEventListener('keydown', (e) => {
+			
+			    // 【注意】原有的沙箱觸發邏輯已移至 beforeinput 事件，
+                // 此處僅保留與沙箱「無關」的快捷鍵功能。
+
+                // 新增：在任何時候，只要焦點在編輯器上，按 Tab 鍵即可手動呼叫沙箱
+                if (e.key === 'Tab' && document.activeElement === editor) {
+                    // 阻止 Tab 鍵的預設行為 (切換焦點)
+                    e.preventDefault(); 
+                    // 呼叫沙箱
+                    return;
+                    // 結束事件處理，避免觸發後續的快捷鍵 (例如 Ctrl+H)
+                    return; 
+                }
+
                 // Esc to close modals
                 if (e.key === 'Escape') {
                     let modalWasClosed = false;
@@ -633,6 +1125,12 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     if (modalWasClosed) {
                         e.preventDefault();
                         return; // Stop further key processing if a modal was closed
+                    }
+
+                    if (document.activeElement === editor && isEditMode) {
+                        e.preventDefault();
+                        editor.blur();
+                        return;
                     }
                 }
 
@@ -675,26 +1173,48 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 editor.style.fontWeight = settings.fontWeight;
                 editor.style.color = settings.color;
                 editor.style.backgroundColor = settings.backgroundColor;
-                
+                interimTail.style.fontFamily = settings.fontFamily;
+                interimTail.style.fontSize = settings.fontSize;
+                interimTail.style.lineHeight = settings.lineHeight;
+                interimTail.style.fontStyle = settings.fontStyle;
+                interimTail.style.fontWeight = settings.fontWeight;
+                syncInterimTailLayout();
+                 
+                // 當編輯器樣式改變後，手動同步一次測量工具的樣式
+                if (typeof textMetrics !== 'undefined' && typeof textMetrics.sync === 'function') {
+                    textMetrics.sync();
+                }
+
                 return settings;
             }
 
-            function saveDirectorSettings() {
+            function saveDirectorSettings(options = {}) {
+                const idleSeconds = getEditIdleSeconds();
+                editorIdleSecondsInput.value = idleSeconds;
                 const settings = {
-					fontFamily: directorFontFamilySelect.value,
-					fontSize: `${directorFontSizeInput.value}px`,
-					lineHeight: directorLineHeightInput.value,
-					fontStyle: directorFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
-					fontWeight: directorFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
-					color: directorFontColorInput.value,
-					backgroundColor: directorBgColorInput.value,
-					speechBreakMode: directorSpeechBreakMode.value
+                    fontFamily: directorFontFamilySelect.value,
+                    fontSize: `${directorFontSizeInput.value}px`,
+                    lineHeight: directorLineHeightInput.value,
+                    fontStyle: directorFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
+                    fontWeight: directorFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
+                    color: directorFontColorInput.value,
+                    backgroundColor: directorBgColorInput.value,
+                    collaborationMode: directorCollaborationModeSelect.value,
+                    speechBreakMode: directorSpeechBreakMode.value,
+                    editIdleSeconds: idleSeconds
 				};
                 localStorage.setItem('directorEditorSettings', JSON.stringify(settings));
                 try {
+                    const broadcastSettings = {
+                        ...settings,
+                        theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light'
+                    };
+                    if (!options.includeCollaborationMode) {
+                        delete broadcastSettings.collaborationMode;
+                    }
                     socket.emit('update_director_settings', {
                         room: ROOM_ID,
-                        settings: { ...settings, theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light' }
+                        settings: broadcastSettings
                     });
                 } catch(e) {}
             }
@@ -707,7 +1227,8 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     fontStyle: viewerFontStyleSelect.value === 'italic' ? 'italic' : 'normal',
                     fontWeight: viewerFontStyleSelect.value === 'bold' ? 'bold' : 'normal',
                     color: viewerFontColorInput.value,
-                    backgroundColor: viewerBgColorInput.value
+                    backgroundColor: viewerBgColorInput.value,
+                    forceScrollBottom: viewerForceScrollBottomInput.checked
                 };
                 localStorage.setItem('viewerEditorSettings', JSON.stringify(settings));
                 
@@ -752,14 +1273,29 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 directorFontColorInput.value = settings.color || '#000000';
                 directorBgColorInput.value = settings.backgroundColor || '#FFFFFF';
 				
-				directorSpeechBreakMode.value = settings.speechBreakMode || 'double-newline';
+                directorCollaborationModeSelect.value = settings.collaborationMode === 'manual_transcription'
+                    ? 'manual_transcription'
+                    : 'human_ai';
+				directorSpeechBreakMode.value = settings.speechBreakMode || 'newline';
+                editorIdleSecondsInput.value = Math.min(60, Math.max(1, parseInt(settings.editIdleSeconds, 10) || 3));
                 applyDirectorSettings();
+                if (isManualTranscriptionMode()) {
+                    flushPendingServerText();
+                    handleEditorScroll();
+                    if (isRecording || localState?.speech_user === socket.id) {
+                        stopSpeechRecognition().catch((e) => console.error('stopSpeechRecognition failed:', e));
+                    }
+                }
+                updateSpeechLockUI(localState?.speech_user || null);
+                if (isEditMode) {
+                    resetEditAutoExitTimer();
+                }
             }
 
             function updateViewerControls(settings) {
                 if (!settings) return;
                 viewerFontFamilySelect.value = settings.fontFamily || "'Microsoft JhengHei', '蘋方-繁', sans-serif";
-                viewerFontSizeInput.value = parseInt(settings.fontSize, 10) || 40;
+                viewerFontSizeInput.value = parseInt(settings.fontSize, 10) || 60;
                 viewerLineHeightInput.value = settings.lineHeight || 1.4;
                 if (settings.fontWeight === 'bold') {
                     viewerFontStyleSelect.value = 'bold';
@@ -770,6 +1306,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 }
                 viewerFontColorInput.value = settings.color || '#FFFFFF';
                 viewerBgColorInput.value = settings.backgroundColor || '#000000';
+                viewerForceScrollBottomInput.checked = Boolean(settings.forceScrollBottom);
             }
 
             function importSettingsFromJson(jsonText) {
@@ -805,19 +1342,21 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             }
             
             // --- Handler function to apply AND save director settings ---
-            function handleDirectorSettingsChange() {
+            function handleDirectorSettingsChange(event) {
                 applyDirectorSettings(); // 步驟 1: 立即將樣式應用到畫面上，提供即時反饋
-                saveDirectorSettings();  // 步驟 2: 保存設定並廣播給協作者
+                saveDirectorSettings({
+                    includeCollaborationMode: event?.target === directorCollaborationModeSelect
+                });  // 步驟 2: 保存設定並廣播給協作者
             }
 
             // Bind the new handler to all director controls
-            [directorFontFamilySelect, directorFontSizeInput, directorFontStyleSelect, directorFontColorInput, directorBgColorInput, directorLineHeightInput, directorSpeechBreakMode].forEach(el => {
-                // 使用 'input' 事件可以同時捕捉到數字輸入、顏色選擇和下拉選單的變更
-                el.addEventListener('input', handleDirectorSettingsChange);
+            [directorFontFamilySelect, directorFontSizeInput, directorFontStyleSelect, directorFontColorInput, directorBgColorInput, directorLineHeightInput, directorCollaborationModeSelect, directorSpeechBreakMode, editorIdleSecondsInput].forEach(el => {
+                const eventName = el.tagName === 'SELECT' ? 'change' : 'input';
+                el.addEventListener(eventName, handleDirectorSettingsChange);
             });
 
             // Viewer settings logic remains unchanged, as it doesn't need to apply locally.
-            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput].forEach(el => {
+            [viewerFontFamilySelect, viewerFontSizeInput, viewerFontStyleSelect, viewerFontColorInput, viewerBgColorInput, viewerLineHeightInput, viewerForceScrollBottomInput].forEach(el => {
                 el.addEventListener('input', saveViewerSettings);
             });
 
@@ -900,6 +1439,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 }
             });
 
+            paneToggleBtn.innerHTML = mainContainer.classList.contains('settings-collapsed') ? '&laquo;' : '&raquo;';
             updatePaneTogglePosition();
             updatePaneToggleAria();
 
@@ -942,32 +1482,6 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 } catch (e) {}
             }
 
-            /**
-             * 以伺服器的 quick_inputs 為權威來源同步片段嘅 UI
-             * 用於斷線重連、多瀏覽器協作時確保狀態一致
-             * @param {Object} serverInputs - 從 state_update 收到的 quick_inputs
-             */
-            function syncSnippetsFromServer(serverInputs) {
-                if (!serverInputs || typeof serverInputs !== 'object') return;
-                try {
-                    // NOTE: 判斷是否與目前本地不同，相同則跳過避免不必要的 DOM 操作
-                    const localRaw = localStorage.getItem('editorSnippets') || '{}';
-                    const localData = JSON.parse(localRaw);
-                    const hasChange = snippetTextareas.some((ta, idx) => {
-                        const key = idx === 9 ? '0' : String(idx + 1);
-                        return (serverInputs[key] || '') !== (localData[key] || '');
-                    });
-                    if (!hasChange) return;
-
-                    // 將伺服器版本寫入 UI 和 localStorage
-                    snippetTextareas.forEach((ta, idx) => {
-                        const key = idx === 9 ? '0' : String(idx + 1);
-                        ta.value = serverInputs[key] || '';
-                    });
-                    localStorage.setItem('editorSnippets', JSON.stringify(serverInputs));
-                } catch(e) {}
-            }
-
             function updateSnippetsTogglePosition() {
                 if (mainContainer.classList.contains('snippets-collapsed')) {
                     snippetsToggleBtn.style.left = '0px';
@@ -998,12 +1512,56 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSnippetsPane(); }
             });
 
+            const snippetsSaveBtn = document.getElementById('snippets-save-btn');
+            const snippetsLoadBtn = document.getElementById('snippets-load-btn');
+            const snippetsFileInput = document.getElementById('snippets-file-input');
+
             snippetTextareas.forEach(ta => ta.addEventListener('input', saveSnippets));
             if (snippetsClearBtn) {
                 snippetsClearBtn.addEventListener('click', () => {
                     if (!window.confirm('確定清空所有片段嗎？')) return;
                     snippetTextareas.forEach(ta => ta.value = '');
                     saveSnippets();
+                });
+            }
+
+            if (snippetsSaveBtn) {
+                snippetsSaveBtn.addEventListener('click', () => {
+                    const snippetsJson = localStorage.getItem('editorSnippets') || '{}';
+                    const blob = new Blob([snippetsJson], { type: 'application/json' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'snippets.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                });
+            }
+
+            if (snippetsLoadBtn) {
+                snippetsLoadBtn.addEventListener('click', () => snippetsFileInput.click());
+            }
+
+            if (snippetsFileInput) {
+                snippetsFileInput.addEventListener('change', (e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        try {
+                            const jsonText = String(ev.target?.result || '{}');
+                            // 驗證一下是否為合法的JSON
+                            JSON.parse(jsonText); 
+                            // 直接寫入 localStorage 並呼叫現有的載入函式，最簡單
+                            localStorage.setItem('editorSnippets', jsonText);
+                            loadSnippets();
+                        } catch (err) {
+                            alert('載入失敗，請確認檔案格式為正確的 JSON。');
+                        }
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                    e.target.value = ''; // 重設檔案輸入框，以便可以再次上傳同一個檔案
                 });
             }
             document.querySelectorAll('.snippet-insert-btn').forEach(btn => {
@@ -1042,6 +1600,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
             document.addEventListener('keydown', handleSnippetHotkeys, true);
 
             loadSnippets();
+            snippetsToggleBtn.innerHTML = mainContainer.classList.contains('snippets-collapsed') ? '&raquo;' : '&laquo;';
             updateSnippetsTogglePosition();
             updateSnippetsToggleAria();
 
@@ -1050,7 +1609,10 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 if (socket.connected) {
                     let statusText = `已連線 ✅ (${latency}ms)`;
                     if (connectionCounts) {
-                        statusText += ` / 在線人數: ${connectionCounts.directors}人`;
+                        const directors = Number(connectionCounts.directors || 0);
+                        const viewers = Number(connectionCounts.viewers || 0);
+                        const total = Number(connectionCounts.total ?? (directors + viewers));
+                        statusText += ` / 在線: ${total}人（導播:${directors} 觀眾:${viewers}）`;
                     }
                     statusDiv.textContent = statusText;
                 } else {
@@ -1058,9 +1620,34 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 }
             }
 
+            function updateSpeechLockUI(speechUser) {
+                const isManualMode = isManualTranscriptionMode();
+                const isLocked = speechUser && speechUser !== socket.id;
+                
+                
+
+                speechToggleBtn.disabled = isManualMode || isLocked;
+                directorSpeechBreakMode.disabled = isManualMode || isLocked;
+
+                if (isManualMode) {
+                    speechToggleBtn.textContent = '人工聽打模式';
+                    if (!isRecording) {
+                        speechToggleBtn.classList.remove('recording');
+                    }
+                } else if (isLocked) {
+                    speechToggleBtn.textContent = '語音轉錄佔用';
+                    speechToggleBtn.classList.add('recording'); 
+                } else {
+                    if (!isRecording) {
+                        speechToggleBtn.textContent = '開始語音識別';
+                        speechToggleBtn.classList.remove('recording');
+                    }
+                }
+            }
+
             socket.on('connect', () => {
                 statusDiv.textContent = '已連線 ✅';
-                socket.emit('join', { room: ROOM_ID });
+                socket.emit('join', { room: ROOM_ID, role: 'director' });
                 
                 loadSettings();
                 const savedTheme = localStorage.getItem('editorTheme') || 'light';
@@ -1074,8 +1661,16 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 connectionCounts = null;
             });
 
+            socket.on('speech_state_update', (data) => {
+                if (localState) {
+                    localState.speech_user = data.speech_user;
+                }
+                updateSpeechLockUI(data.speech_user);
+            });
+
             socket.on('state_update', wrapUpdateFunction((newState) => {
                 localState = newState;
+                if (!newState) return;
                 if (newState) {
                     if (newState.viewer_id) {
                         try { localStorage.setItem('viewerId_' + ROOM_ID, newState.viewer_id); } catch(_) {}
@@ -1083,24 +1678,31 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     updateDirectorControls(newState.director_settings);
                     updateViewerControls(newState.viewer_settings);
                     applyTheme(newState.director_settings?.theme || 'light');
-                    // NOTE: 以伺服器片段資料為權威來源，同步到本地 UI
-                    syncSnippetsFromServer(newState.quick_inputs);
+                    updateSpeechLockUI(newState.speech_user);
+                    setInterimTailText(newState.interim_text || '');
                 }
 
-                lastSentText = newState.raw_text;
-				if (isComposing) return;
-                if (editor.value !== newState.raw_text) {
-                    const cursorPos = editor.selectionStart;
-                    editor.value = newState.raw_text;
-                    try { editor.selectionStart = editor.selectionEnd = Math.min(cursorPos, editor.value.length); } catch (e) {}
-                }
+                applyOrQueueServerText(newState.raw_text);
             }));
-            
+
+            socket.on('director_settings_update', (data) => {
+                if (data && data.settings) {
+                    updateDirectorControls(data.settings);
+                    applyDirectorSettings();
+                    localStorage.setItem('directorEditorSettings', JSON.stringify(data.settings));
+                }
+            });
+             
             socket.on('viewer_settings_update', (data) => {
                 if (data && data.settings) {
                     updateViewerControls(data.settings);
                     localStorage.setItem('viewerEditorSettings', JSON.stringify(data.settings));
                 }
+            });
+
+            socket.on('interim_update', (payload) => {
+                setInterimTailText(payload?.text || '');
+                flushPendingServerText();
             });
 
             setInterval(() => {
@@ -1117,110 +1719,176 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 updateStatusDisplay();
             });
 
-            socket.on('script_patched', wrapUpdateFunction((data) => {
-				if (isComposing) return;
+			socket.on('script_patched', wrapUpdateFunction((data) => {
                 const patch_text = data.patch;
                 const oldText = editor.value;
-                const oldCursorPos = editor.selectionStart;
+                if (shouldDeferServerApply()) {
+                    scheduleFullStateResync(250);
+                    return;
+                }
                 try {
                     const patches = dmp.patch_fromText(patch_text);
                     const [newText, results] = dmp.patch_apply(patches, oldText);
                     if (results.some(res => !res)) {
-                        socket.emit('join', { room: ROOM_ID });
+                        socket.emit('join', { room: ROOM_ID, role: 'director' });
                         return;
                     }
-                    editor.value = newText;
-                    lastSentText = newText;
-                    const diffs = dmp.diff_main(oldText, newText);
-                    const newCursorPos = dmp.diff_xIndex(diffs, oldCursorPos);
-                    editor.selectionStart = editor.selectionEnd = newCursorPos;
+                    applyOrQueueServerText(newText);
+
+                    // === 新增：同步更新 IME 沙箱的錨點位置 ===
+                    if (isSandboxActive) {
+                        const diffs = dmp.diff_main(oldText, newText);
+                        const newAnchorPos = dmp.diff_xIndex(diffs, sandboxAnchorPosition);
+                        sandboxAnchorPosition = newAnchorPos;
+                        
+                        // 重新定位沙箱的顯示位置
+                        const coords = textMetrics.getCoords(sandboxAnchorPosition);
+                        if (coords) {
+                            imeSandbox.style.top = `${coords.top - editor.scrollTop + 4}px`;
+                            imeSandbox.style.left = `${coords.left - editor.scrollLeft}px`;
+                        }
+                    }
+
                 } catch (error) {
-                    socket.emit('join', { room: ROOM_ID });
+                    socket.emit('join', { room: ROOM_ID, role: 'director' });
                 }
             }));
 
-            let isComposing = false;
-            editor.addEventListener('compositionstart', () => { isComposing = true; });
-            editor.addEventListener('compositionend', () => { 
-                isComposing = false; 
-                editor.dispatchEvent(new Event('input', { bubbles: true }));
-            });
 
-            // NEW: Function to check if cursor is in reserved area
-            function isInReservedArea(position) {
-                if (speechReservedLines === 0) return false;
-                const text = editor.value;
-                const lastContentPos = findLastContentPosition();
-                return position > lastContentPos && position <= text.length;
-            }
-            
-            // NEW: Function to restrict editing in reserved areas
-            function preventReservedAreaEditing(e) {
-                if (speechReservedLines === 0) return;
-                
-                const selStart = editor.selectionStart;
-                const selEnd = editor.selectionEnd;
-                
-                // Check if selection includes reserved area
-                if (isInReservedArea(selStart) || isInReservedArea(selEnd)) {
-                    // Move cursor to last content position
-                    const lastContentPos = findLastContentPosition();
-                    setTimeout(() => {
-                        editor.selectionStart = editor.selectionEnd = Math.max(0, lastContentPos);
-                    }, 0);
-                    
-                    // Prevent the input if it would modify reserved area
-                    if (e && (e.type === 'keydown' || e.type === 'input')) {
-                        e.preventDefault();
-                        return false;
+            function sendEditorPatchUpdate() {
+                if (isComposing) return false;
+                const currentText = editor.value;
+                if (currentText !== lastSentText) {
+                    const patch_text = dmp.patch_toText(dmp.patch_make(lastSentText, currentText));
+                    if (patch_text) {
+                        socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
+                        lastSentText = currentText;
+                        return true;
                     }
+                    lastSentText = currentText;
                 }
+                return false;
+            }
+
+            function handleManualPatchSentWithPendingServerText(sentPatch) {
+                if (!isManualTranscriptionMode()) return false;
+                if (!sentPatch || pendingServerText == null) return false;
+                pendingServerText = null;
+                scheduleFullStateResync(80);
                 return true;
             }
-            
-            // Add event listeners for reserved area protection
-            editor.addEventListener('keydown', (e) => {
-                // Allow navigation keys
-                const navigationKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'];
-                if (navigationKeys.includes(e.key)) {
-                    return;
-                }
-                
-                // Prevent typing in reserved area
-                if (!preventReservedAreaEditing(e)) {
-                    return;
-                }
-            });
-            
-            editor.addEventListener('click', () => {
-                setTimeout(() => preventReservedAreaEditing(), 0);
-            });
-            
-            editor.addEventListener('input', () => {
-                // Check for reserved area editing
-                if (!preventReservedAreaEditing()) {
-                    return;
-                }
-                
-                clearTimeout(patchUpdateTimeout);
-                patchUpdateTimeout = setTimeout(() => {
-                    if (isComposing) return;
-                    const currentText = editor.value;
-                    if (currentText !== lastSentText) {
-                        const patch_text = dmp.patch_toText(dmp.patch_make(lastSentText, currentText));
-                        if (patch_text) {
-                            socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
-                        }
-                        lastSentText = currentText;
+
+            // 人工聽打模式：以小幅 debounce 批次送出 patch，
+            // 避免每個按鍵都打一輪 patch + 伺服器全量 echo。
+            function sendManualPatchUpdate() {
+                handleManualPatchSentWithPendingServerText(sendEditorPatchUpdate());
+            }
+
+            // 人工聽打模式：把「組字中（尚未落地）」的文字即時廣播給其他端，
+            // 讓共筆者／觀眾以淡色暫存先看到；自己的 textarea 已即時呈現組字內容，
+            // 故以 include_self=False 廣播（伺服器端處理），本端不顯示在浮動暫存區。
+            function broadcastCompositionInterim(text) {
+                if (!isManualTranscriptionMode()) return;
+                try {
+                    socket.emit('composition_interim', { room: ROOM_ID, text: String(text || '') });
+                } catch (e) {}
+            }
+
+				editor.addEventListener('input', () => {
+                    markEditActivity();
+                    if (isEditMode) resetEditAutoExitTimer();
+					clearTimeout(patchUpdateTimeout);
+                    if (isManualTranscriptionMode()) {
+                        patchUpdateTimeout = setTimeout(sendManualPatchUpdate, 50);
+                        return;
                     }
-                }, 80);
+					patchUpdateTimeout = setTimeout(sendEditorPatchUpdate, 80);
+			});
+
+	            editor.addEventListener('compositionstart', () => {
+	                isComposing = true;
+                    markEditActivity();
+	                if (isEditMode) resetEditAutoExitTimer();
+	            });
+
+                editor.addEventListener('compositionupdate', (e) => {
+                    markEditActivity();
+                    if (isEditMode) resetEditAutoExitTimer();
+                    broadcastCompositionInterim(e.data);
+                });
+
+	            editor.addEventListener('compositionend', () => {
+	                isComposing = false;
+                    markEditActivity();
+                    if (isManualTranscriptionMode()) {
+                        setTimeout(() => {
+                            const handledPendingResync = handleManualPatchSentWithPendingServerText(sendEditorPatchUpdate());
+                            if (!handledPendingResync) {
+                                flushPendingServerText();
+                            }
+                            // 落地後清掉其他端的淡色組字暫存（正式文字改由 patch 帶出實色）。
+                            broadcastCompositionInterim('');
+                            if (isEditMode) resetEditAutoExitTimer();
+                        }, 0);
+                        return;
+                    }
+	                flushPendingServerText();
+                    sendEditorPatchUpdate();
+	                if (isEditMode) resetEditAutoExitTimer();
+	            });
+
+	            editor.addEventListener('focus', () => {
+                    markEditActivity();
+	                setEditMode(true);
+	            });
+
+            editor.addEventListener('blur', () => {
+                setEditMode(false);
             });
+
+	            ['keydown', 'click', 'mouseup', 'select'].forEach((ev) => {
+	                editor.addEventListener(ev, () => {
+                        markEditActivity();
+	                    if (isEditMode) resetEditAutoExitTimer();
+	                });
+	            });
+			
+            // === 新增：IME 沙箱的事件監聽 ===
+            imeSandbox.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // 阻止 contenteditable 預設的換行行為
+                    commitSandboxText();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    hideSandbox();
+                }
+            });
+
+            // 當沙箱失去焦點時 (例如使用者點擊了頁面其他地方)，就取消輸入
+            imeSandbox.addEventListener('blur', () => {
+                // 用一個微小的延遲來處理，避免與 Enter 提交的焦點切換衝突
+                setTimeout(() => {
+                    if (document.activeElement !== imeSandbox) {
+                       hideSandbox();
+                    }
+                }, 100);
+            });			
 
             // --- Button Event Listeners ---
             editor.addEventListener('scroll', handleEditorScroll);
             scrollToBottomBtn.addEventListener('click', () => {
+                shouldAutoScrollEditor = true;
                 scrollToBottom(editor);
+                handleEditorScroll();
             });
+            handleEditorScroll();
+
+            // 定期偵測並強制滾動置底
+            setInterval(() => {
+                if (shouldAutoScrollEditor) {
+                    scrollToBottom(editor);
+                }
+            }, 1500);
 
 			shareViewerBtn.addEventListener('click', async () => {
                 const viewerUrl = `${location.origin}/view/${localStorage.getItem('viewerId_' + ROOM_ID) || ''}`;
@@ -1398,124 +2066,110 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 return newLines.join('\n');
             }
 
-            // === Speech Recognition (REWRITTEN WITH DYNAMIC EMPTY LINE MANAGEMENT) ===
+            // === Speech Recognition (REWRITTEN) ===
             function showSpeechStatus(message, type = 'info') {
                 try { console.debug('[Speech]', type, message || ''); } catch(e) {}
             }
             
             // Speech Recognition State
-            let recognition = null;
-            let isRecording = false;
-            let userRequestedStop = false;
-            
-            // NEW: Dynamic Empty Line Management for Speech Transcription
-            let speechReservedLines = 0; // Number of reserved empty lines
-            let speechStartPosition = null; // Position where speech transcription started
-            let lastInterimLineCount = 0; // Track interim text line count for dynamic adjustment
-            
-            // Speech anchor management
+            // NEW: 語音辨識策略管理
+            let recognitionStrategy = 'auto'; // 'auto' (Edge模式) 或 'manual' (Chrome模式)
+            let strategyHasBeenSet = false; // 是否已決定策略
+            let lastFinalTranscript = ''; // for 'manual' strategy
+            let sentenceBuffer = ''; // for 'manual' strategy
+            let sentenceFinalizeTimeout = null; // for 'manual' strategy
+			// NEW: Proactive Restart state for Chrome
+			let proactiveRestartTimer = null; 
+			let isProactivelyRestarting = false;
+
+            const RESTART_BACKOFF_INITIAL_MS = 200;
+            const RESTART_BACKOFF_MAX_MS = 2000;
+            let restartBackoffMs = RESTART_BACKOFF_INITIAL_MS;
+
+            // Anchor/Cursor management variables
             let speechAnchor = null;
             let provisionalBuffer = '';
             let anchorInitialSelLen = 0;
-            
-            // NEW: Text metrics and line calculation utilities for speech overlay
-            function calculateInterimLineCount(text, textareaWidth) {
-                if (!text) return 0;
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const style = window.getComputedStyle(editor);
-                ctx.font = `${style.fontSize} ${style.fontFamily}`;
-                
-                const lines = text.split('\n');
-                let totalLines = 0;
-                
-                for (const line of lines) {
-                    if (line === '') {
-                        totalLines += 1;
-                        continue;
-                    }
-                    const textWidth = ctx.measureText(line).width;
-                    const availableWidth = textareaWidth - 72; // Account for padding
-                    const wrappedLines = Math.max(1, Math.ceil(textWidth / availableWidth));
-                    totalLines += wrappedLines;
-                }
-                
-                return totalLines;
+            let lastCursorStart = null, lastCursorEnd = null;
+            let pendingAnchorStart = null, pendingAnchorSelLen = 0;
+
+            function insertAtCursor(textarea, text) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const before = textarea.value.substring(0, start);
+                const after = textarea.value.substring(end);
+                textarea.value = before + text + after;
+                textarea.selectionStart = textarea.selectionEnd = start + text.length;
             }
-            
-            function getTextAreaContentWidth() {
-                const style = window.getComputedStyle(editor);
-                const paddingLeft = parseFloat(style.paddingLeft) || 0;
-                const paddingRight = parseFloat(style.paddingRight) || 0;
-                return editor.clientWidth - paddingLeft - paddingRight;
-            }
-            
-            function findLastContentPosition() {
-                const text = editor.value;
-                // Find the last non-empty line position
-                const lines = text.split('\n');
-                let lastContentIndex = -1;
-                
-                for (let i = lines.length - 1; i >= 0; i--) {
-                    if (lines[i].trim() !== '') {
-                        // Calculate position at end of this line
-                        lastContentIndex = lines.slice(0, i + 1).join('\n').length;
-                        break;
-                    }
+
+            // NEW: 策略偵測函式
+            function detectRecognitionStrategy(transcript) {
+                // 檢查是否包含中文或英文的標点符號
+                const hasPunctuation = /[.,?!;，。？！；]/.test(transcript);
+                if (hasPunctuation) {
+                    return 'auto'; // Edge模式
                 }
-                
-                return lastContentIndex === -1 ? 0 : lastContentIndex;
+                return 'manual'; // Chrome模式
             }
-            
-            function addReservedEmptyLines(lineCount) {
-                const currentText = editor.value;
-                const lastContentPos = findLastContentPosition();
-                
-                // Remove existing reserved lines first
-                let textWithoutReserved = currentText;
-                if (speechReservedLines > 0) {
-                    const linesToRemove = '\n'.repeat(speechReservedLines);
-                    textWithoutReserved = currentText.replace(new RegExp(linesToRemove + '$'), '');
+
+            function requestSpeechStartLock() {
+                if (isManualTranscriptionMode()) {
+                    return Promise.resolve({
+                        granted: false,
+                        speech_user: null,
+                        reason: 'manual_transcription_mode'
+                    });
                 }
-                
-                // Add new reserved lines
-                const newReservedLines = '\n'.repeat(lineCount);
-                const newText = textWithoutReserved + newReservedLines;
-                
-                editor.value = newText;
-                speechReservedLines = lineCount;
-                
-                // Sync to collaborators
+                return new Promise((resolve) => {
+                    socket.emit('request_speech_start', { room: ROOM_ID }, (ack) => resolve(ack || {}));
+                });
+            }
+
+            function requestSpeechStopLock() {
+                return new Promise((resolve) => {
+                    socket.emit('request_speech_stop', { room: ROOM_ID }, (ack) => resolve(ack || {}));
+                });
+            }
+
+            function pushInterimText(text, shouldBroadcast = false) {
+                setInterimTailText(text);
+                if (shouldBroadcast) {
+                    try { socket.emit('interim_text', { room: ROOM_ID, text: String(text || '') }); } catch (e) {}
+                }
+            }
+
+            const appendCommittedText = wrapUpdateFunction((addedText, addSeparator = true) => {
+                // 雙保險：人工聽打模式下，不接受任何語音文字落地。
+                if (isManualTranscriptionMode()) {
+                    pushInterimText('', true);
+                    return;
+                }
+                const rawChunk = String(addedText || '');
+                if (!rawChunk.trim()) {
+                    pushInterimText('', true);
+                    return;
+                }
+                const chunk = rawChunk.replace(/\n+$/, '');
+
+                let separator = '';
+                if (addSeparator) {
+                    const breakMode = directorSpeechBreakMode.value;
+                    if (breakMode === 'newline') separator = '\n';
+                    if (breakMode === 'double-newline') separator = '\n\n';
+                }
+
+                const nextText = `${editor.value}${chunk}${separator}`;
+                editor.value = nextText;
                 try {
-                    const patch_text = dmp.patch_toText(dmp.patch_make(currentText, newText));
-                    if (patch_text) {
-                        socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
-                        lastSentText = newText;
-                    }
-                } catch(e) {}
-            }
-            
-            function removeReservedEmptyLines() {
-                if (speechReservedLines === 0) return;
-                
-                const currentText = editor.value;
-                const linesToRemove = '\n'.repeat(speechReservedLines);
-                const newText = currentText.replace(new RegExp(linesToRemove + '$'), '');
-                
-                editor.value = newText;
-                speechReservedLines = 0;
-                
-                // Sync reserved line removal to collaborators
-                try {
-                    const patch_text = dmp.patch_toText(dmp.patch_make(currentText, newText));
-                    if (patch_text) {
-                        socket.emit('patch_script', { room: ROOM_ID, patch: patch_text });
-                        lastSentText = newText;
-                    }
-                } catch(e) {}
-            }
-            
-            // Initialize speech recognition with dynamic empty line management
+                    editor.selectionStart = editor.selectionEnd = nextText.length;
+                } catch (e) {}
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+                pushInterimText('', true);
+                if (isSpeechOwner()) {
+                    notifyMainTextUpdated();
+                }
+            });
+
             function initializeSpeechRecognition() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
@@ -1527,259 +2181,481 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                
-                recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
-                    
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        } else {
-                            interimTranscript += event.results[i][0].transcript;
-                        }
-                    }
 
-                    if (interimTranscript) {
-                        const textareaWidth = getTextAreaContentWidth();
-                        const neededLines = calculateInterimLineCount(interimTranscript, textareaWidth);
-                        const requiredEmptyLines = neededLines + 1;
-                        
-                        if (requiredEmptyLines !== speechReservedLines) {
-                            addReservedEmptyLines(requiredEmptyLines);
+                let guardTail = ''; // Specific to 'auto' mode, but we keep it scoped here
+                let awaitingFirstAfterRestart = false;
+                
+                function updateLastCursor() {
+                    try { 
+                        lastCursorStart = editor.selectionStart; 
+                        lastCursorEnd = editor.selectionEnd; 
+                    } catch(e) {}
+                }
+
+                function setSpeechAnchorIfUnset() {
+                    if (speechAnchor == null) {
+                        const len = editor.value.length;
+                        let start, end;
+                        if (pendingAnchorStart != null) {
+                            start = Math.max(0, Math.min(pendingAnchorStart, len));
+                            end = Math.max(start, Math.min(start + pendingAnchorSelLen, len));
+                            pendingAnchorStart = null; 
+                            pendingAnchorSelLen = 0;
+                        } else {
+                            start = (lastCursorStart != null) ? lastCursorStart : len;
+                            end = (lastCursorEnd != null) ? lastCursorEnd : start;
                         }
-                        
-                        lastInterimLineCount = neededLines;
-                        
-                        const lastContentPos = findLastContentPosition();
-                        const overlayPosition = lastContentPos > 0 ? lastContentPos + 1 : lastContentPos;
-                        showInterimAtCursor(interimTranscript, overlayPosition);
+                        speechAnchor = Math.max(0, Math.min(start, len));
+                        anchorInitialSelLen = Math.max(0, Math.min(end - start, len - speechAnchor));
                     }
-                    
-                    if (finalTranscript) {
-                        removeReservedEmptyLines();
-                        const breakMode = directorSpeechBreakMode.value;
-                        let separator = '';
-                        if (breakMode === 'newline') {
-                            separator = '\n';
-                        } else if (breakMode === 'double-newline') {
-                            separator = '\n\n';
-                        }
-                        const textToInsert = finalTranscript + separator;
-                        insertAtCursor(editor, textToInsert);
-                        
-                        showInterimAtCursor('', 0);
-                        lastInterimLineCount = 0;
-                    }
+                }
+                
+                const provisionalWrite = (interim) => {
+                    pushInterimText(interim, true);
                 };
+
+				const finalizeCommit = (addedText, addSeparator = true) => {
+                    appendCommittedText(addedText, addSeparator);
+                    provisionalBuffer = '';
+                    anchorInitialSelLen = 0;
+                };
+
+                function mergeWithGuardTail(tail, incoming) {
+                    const t = String(tail || ''), s = String(incoming || '');
+                    if (!t) return s; if (!s) return t;
+                    const maxOverlap = Math.min(t.length, s.length);
+                    for (let k = maxOverlap; k >= 3; k--) {
+                        if (t.slice(-k) === s.slice(0, k)) {
+                            awaitingFirstAfterRestart = false;
+                            return t + s.slice(k);
+                        }
+                    }
+                    awaitingFirstAfterRestart = false;
+                    return t + s;
+                }
+				
+				// NEW: Proactive restart function for 'manual' (Chrome) mode
+				function proactiveRestart() {
+					if (!isRecording || userRequestedStop) return;
+					console.log("Proactively restarting speech recognition to maintain connection...");
+					isProactivelyRestarting = true;
+					try {
+						recognition.stop();
+					} catch(e) {
+						// If stop fails, reset flag and log error
+						console.error("Error calling stop() for proactive restart:", e);
+						isProactivelyRestarting = false;
+					}
+				}
+
+                ['keyup','click','select','mouseup','input','focus','blur'].forEach(ev => 
+                    editor.addEventListener(ev, updateLastCursor)
+                );
                 
                 recognition.onstart = () => {
                     isRecording = true;
+                    restartBackoffMs = RESTART_BACKOFF_INITIAL_MS;
+                    try { setSpeechAnchorIfUnset(); } catch(e) {}
                     speechToggleBtn.textContent = '停止語音識別';
                     speechToggleBtn.classList.add('recording');
-                    
-                    speechReservedLines = 0;
-                    lastInterimLineCount = 0;
-                    speechStartPosition = null;
+                    showSpeechStatus('正在聆聽...', 'info');
                 };
-                
-                recognition.onend = () => {
-                    if (userRequestedStop) {
-                        // NOTE: 使用者主動停止，正常正山狄0
-                        isRecording = false;
-                        speechToggleBtn.textContent = '開始語音識別';
-                        speechToggleBtn.classList.remove('recording');
-                        removeReservedEmptyLines();
-                    } else if (isRecording) {
-                        // NOTE: 非使用者主動停止（網路抒動、手機鎖屏等），自動失常等待後嘗試重啟
-                        setTimeout(() => {
-                            if (!userRequestedStop && isRecording) {
-                                try {
-                                    recognition.lang = speechLangSelect.value;
-                                    recognition.start();
-                                } catch(e) {
-                                    console.error('Speech recognition restart error:', e);
-                                }
-                            }
-                        }, 300);
-                    }
-                };
-                
+
+				recognition.onend = () => {
+					clearTimeout(sentenceFinalizeTimeout); // Always clear timers on end
+
+					// If this was a planned proactive restart, start immediately.
+					if (isProactivelyRestarting) {
+						isProactivelyRestarting = false; // Reset the flag
+						if (!userRequestedStop) {
+							try {
+								recognition.start();
+							} catch(e) { console.error("Error on proactive restart:", e); }
+						}
+						return; 
+					}
+
+					// If the recognition ends naturally (e.g., long pause) AND there's content, finalize it.
+					if (recognitionStrategy === 'manual' && sentenceBuffer) {
+						const punctuation = speechLangSelect.value.startsWith('zh') ? '。' : '.';
+						finalizeCommit(sentenceBuffer + punctuation, true);
+						sentenceBuffer = '';
+						lastFinalTranscript = '';
+					}
+
+					if (userRequestedStop) {
+						isRecording = false;
+						speechToggleBtn.textContent = '開始語音識別';
+						speechToggleBtn.classList.remove('recording');
+                        setInterimTailText('');
+						showSpeechStatus('識別已停止。', 'info');
+						return;
+					}
+					
+					// This part now only runs on truly unexpected stops.
+					showSpeechStatus('識別串流意外中斷，嘗試重啟…', 'warn');
+					setTimeout(() => {
+						if (!userRequestedStop) try { recognition.start(); } catch(e) {}
+					}, restartBackoffMs);
+					restartBackoffMs = Math.min(RESTART_BACKOFF_MAX_MS, restartBackoffMs * 2);
+				};
+
                 recognition.onerror = (event) => {
-                    console.error('Speech recognition error:', event.error);
-                    // NOTE: 不可復覆的錯誤類型，停止語音識別避免無限重啟
-                    const nonRecoverableErrors = ['not-allowed', 'service-not-allowed', 'audio-capture'];
-                    if (nonRecoverableErrors.includes(event.error)) {
+                    let msg = `發生識別錯誤: ${event.error}`;
+                    if (event.error === 'no-speech') msg = '未偵測到語音。';
+                    if (event.error === 'audio-capture') msg = '麥克風無法使用。';
+                    if (event.error === 'not-allowed') msg = '已拒絕麥克風權限。';
+                    showSpeechStatus(msg, 'error');
+                    if (userRequestedStop) return;
+                    if (event.error === 'audio-capture' || event.error === 'not-allowed') {
                         userRequestedStop = true;
-                        isRecording = false;
-                        speechToggleBtn.textContent = '開始語音識別';
-                        speechToggleBtn.classList.remove('recording');
+                        requestSpeechStopLock().catch(() => {});
+                        return;
                     }
+
+                    setTimeout(() => { try { recognition.start(); } catch(e) {} }, Math.min(restartBackoffMs, RESTART_BACKOFF_MAX_MS));
+                    restartBackoffMs = Math.min(RESTART_BACKOFF_MAX_MS, restartBackoffMs * 2);
                 };
+
+				recognition.onresult = (event) => {
+					// 雙保險：切到人工聽打模式的瞬間，殘留的辨識結果一律不處理、不落地。
+					if (isManualTranscriptionMode()) {
+						clearTimeout(sentenceFinalizeTimeout);
+						setInterimTailText('');
+						return;
+					}
+					// Any result cancels the pending finalization/restart timer.
+					clearTimeout(sentenceFinalizeTimeout);
+
+					let interimTranscript = '';
+					let finalTranscript = '';
+					for (let i = event.resultIndex; i < event.results.length; ++i) {
+						if (event.results[i].isFinal) {
+							finalTranscript += event.results[i][0].transcript;
+						} else {
+							interimTranscript += event.results[i][0].transcript;
+						}
+					}
+
+					if (interimTranscript) {
+						const displayInterim = (recognitionStrategy === 'manual') ? sentenceBuffer + interimTranscript : interimTranscript;
+						provisionalWrite(displayInterim);
+					}
+					
+					if (finalTranscript) {
+						if (!strategyHasBeenSet) {
+							recognitionStrategy = detectRecognitionStrategy(finalTranscript);
+							strategyHasBeenSet = true;
+							console.log(`Speech recognition strategy set to: ${recognitionStrategy}`);
+						}
+
+						if (recognitionStrategy === 'auto') {
+							let toInsert = finalTranscript;
+							if (awaitingFirstAfterRestart && guardTail) {
+								toInsert = mergeWithGuardTail(guardTail, finalTranscript);
+							}
+							finalizeCommit(toInsert, true);
+							showSpeechStatus(`已插入: "${toInsert}"`, 'success');
+						
+						} else { // 'manual' strategy
+							if (finalTranscript.startsWith(lastFinalTranscript)) {
+								const newText = finalTranscript.slice(lastFinalTranscript.length);
+								sentenceBuffer += newText;
+							} else {
+								sentenceBuffer = finalTranscript;
+							}
+							lastFinalTranscript = finalTranscript;
+
+							provisionalWrite(sentenceBuffer);
+							showSpeechStatus(`辨識中: ${sentenceBuffer}`, 'info');
+
+							// NEW SMARTER TIMER LOGIC:
+							// This single timer now handles both punctuation and proactive restart.
+							// We wait for a natural pause (800ms). If it happens, we finalize the sentence
+							// AND immediately trigger a proactive restart to be ready for the next one.
+							sentenceFinalizeTimeout = setTimeout(() => {
+								if (sentenceBuffer) {
+									console.log("Pause detected. Finalizing and restarting...");
+									const punctuation = speechLangSelect.value.startsWith('zh') ? '。' : '.';
+									finalizeCommit(sentenceBuffer + punctuation, true);
+									sentenceBuffer = '';
+									lastFinalTranscript = '';
+									
+									// After finalizing, trigger the restart immediately.
+									proactiveRestart(); 
+								}
+							}, 800); // A more stable 800ms threshold
+						}
+					}
+				};
             }
-            
-            function startSpeechRecognition() {
-                if (!recognition) return;
-                userRequestedStop = false;
-                
-                // NOTE: 首次啟動語音識別時，自動清空預設提示文字（只觸發一次）
-                const CLEARED_KEY = 'speechWelcomeCleared_' + ROOM_ID;
-                if (!localStorage.getItem(CLEARED_KEY)) {
-                    localStorage.setItem(CLEARED_KEY, '1');
-                    if (editor.value.trim() !== '') {
-                        wrapUpdateFunction(() => {
-                            editor.value = '';
-                            socket.emit('update_script', { room: ROOM_ID, raw_text: '' });
-                            lastSentText = '';
-                        })();
-                    }
+
+			async function startSpeechRecognition() {
+				if (!recognition) return;
+                if (isManualTranscriptionMode()) {
+                    updateSpeechLockUI(localState?.speech_user || null);
+                    showSpeechStatus('人工聽打模式已停用語音轉錄。', 'info');
+                    return;
                 }
 
-                try {
-                    recognition.lang = speechLangSelect.value;
-                    recognition.start();
-                } catch (e) {
-                    console.error('Speech recognition start error:', e);
+                const startAck = await requestSpeechStartLock();
+                if (!startAck.granted) {
+                    if (localState) {
+                        localState.speech_user = startAck.speech_user || localState.speech_user || null;
+                    }
+                    if (startAck.reason === 'manual_transcription_mode') {
+                        updateSpeechLockUI(null);
+                        showSpeechStatus('人工聽打模式已停用語音轉錄。', 'info');
+                    } else {
+                        alert('語音轉錄功能目前由其他協作者使用中。');
+                    }
+                    return;
                 }
-            }
-            
-            function stopSpeechRecognition() {
-                if (!recognition || !isRecording) return;
-                userRequestedStop = true;
-                
-                try {
-                    recognition.stop();
-                } catch(e) {
-                    console.error('Error stopping recognition:', e);
+                if (localState) {
+                    localState.speech_user = startAck.speech_user || socket.id;
                 }
-            }
-            
+                updateSpeechLockUI(localState?.speech_user || socket.id);
+                if (!hasClearedSpeechHint) {
+                    editor.removeAttribute('placeholder');
+                    hasClearedSpeechHint = true;
+                }
+                // 不再於首次啟動語音轉錄時清空文本，避免中途啟動把既有內容全部清掉。
+                setInterimTailText('');
+
+				userRequestedStop = false;
+
+				// MODIFIED: Reset all state variables for a clean start
+				isProactivelyRestarting = false; 
+				strategyHasBeenSet = false;
+				lastFinalTranscript = '';
+				sentenceBuffer = '';
+				clearTimeout(sentenceFinalizeTimeout);
+				
+				
+				speechAnchor = null;
+				provisionalBuffer = '';
+				anchorInitialSelLen = 0;
+
+				try {
+					updateLastCursor();
+					// ... (the rest of the cursor logic is unchanged)
+					const len = editor.value.length;
+					let start, end;
+					if (pendingAnchorStart !== null) {
+						start = Math.max(0, Math.min(pendingAnchorStart, len));
+						end = Math.max(start, Math.min(start + pendingAnchorSelLen, len));
+					} else {
+						const rawStart = (typeof editor.selectionStart === 'number') ? editor.selectionStart : len;
+						const rawEnd = (typeof editor.selectionEnd === 'number') ? editor.selectionEnd : rawStart;
+						start = Math.max(0, Math.min(rawStart, len));
+						end = Math.max(start, Math.min(rawEnd, len));
+					}
+					speechAnchor = start;
+					anchorInitialSelLen = end - start;
+					pendingAnchorStart = null;
+					pendingAnchorSelLen = 0;
+				} catch(e) {
+					console.error('Setting speech anchor failed:', e);
+				}	
+				
+				try {
+					recognition.lang = speechLangSelect.value;
+					recognition.start();
+				} catch (e) {
+					console.error("Speech recognition start error:", e);
+					showSpeechStatus('啟動識別失敗，可能已在執行中。', 'error');
+                    try { await requestSpeechStopLock(); } catch (_) {}
+				}
+			}
+
+			async function stopSpeechRecognition() {
+				if (!recognition) return;
+                if (!isRecording && localState?.speech_user !== socket.id) return;
+
+                const stopAck = await requestSpeechStopLock();
+                if (!stopAck.stopped) {
+                    if (!isManualTranscriptionMode()) {
+                        updateSpeechLockUI(stopAck.speech_user || (localState && localState.speech_user));
+                        return;
+                    }
+                }
+                if (localState) {
+                    localState.speech_user = stopAck.speech_user || null;
+                }
+                updateSpeechLockUI(localState?.speech_user || null);
+				userRequestedStop = true;
+				
+				// MODIFIED: Clear all timers on manual stop
+				
+				clearTimeout(sentenceFinalizeTimeout);
+
+				try {
+					let textToFinalize = latestInterimText;
+					if (recognitionStrategy === 'manual' && sentenceBuffer) {
+						textToFinalize = sentenceBuffer;
+					}
+					
+					if (textToFinalize) {
+					   finalizeCommit(textToFinalize, false); // Finalize without adding punctuation
+					}
+				} catch(e) {}
+
+				try {
+					recognition.stop();
+				} catch(e) {
+					console.error("Error on stop():", e);
+					// Manually update UI if stop() fails
+					isRecording = false;
+					speechToggleBtn.textContent = '開始語音識別';
+					speechToggleBtn.classList.remove('recording');
+				}
+				
+				try {
+					updateLastCursor();
+					// This part is already correct in your file
+					pendingAnchorStart = editor.selectionStart;
+					pendingAnchorSelLen = editor.selectionEnd - editor.selectionStart;
+				} catch (e) {
+					pendingAnchorStart = null;
+					pendingAnchorSelLen = 0;
+				}
+				
+				// Reset buffers, but not anchor position
+				provisionalBuffer = '';
+				sentenceBuffer = '';
+				lastFinalTranscript = '';
+			}
+
             speechToggleBtn.addEventListener('click', () => {
                 if (isRecording) {
-                    stopSpeechRecognition();
+                    stopSpeechRecognition().catch((e) => console.error('stopSpeechRecognition failed:', e));
                 } else {
-                    startSpeechRecognition();
+                    startSpeechRecognition().catch((e) => console.error('startSpeechRecognition failed:', e));
                 }
             });
-            
-            // Utility functions
-            function insertAtCursor(textarea, text) {
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const before = textarea.value.substring(0, start);
-                const after = textarea.value.substring(end);
-                textarea.value = before + text + after;
-                textarea.selectionStart = textarea.selectionEnd = start + text.length;
-            }
-            
-            // Create interim overlay for showing speech preview
+
+            // Initialize everything
+            initializeSpeechRecognition();
+
+            // 新增：在頁面完全載入（包括字體）後，強制刷新一次游標位置
+            window.addEventListener('load', () => {
+                // 這個監聽器確保在所有資源（特別是字體）都載入完成後執行
+                // 它會重新同步一次 textMetrics 工具，以獲取最準確的文字佈局
+                // 並重新渲染所有遠端游標，解決初始載入時位置偏移的問題
+                if (typeof textMetrics !== 'undefined' && typeof textMetrics.sync === 'function') {
+                    textMetrics.sync();
+                    renderRemoteCursors();
+                }
+            });
+
+// === 將舊的 Remote Cursor Sync Logic 區塊完全替換為這個新版本 ===
+
+            // --- Remote Cursor & Selection Sync Logic (Optimized) ---
             const remoteCursorsOverlay = document.getElementById('remote-cursors-overlay');
-            const interimOverlay = document.createElement('div');
-            interimOverlay.className = 'interim-overlay';
-            remoteCursorsOverlay.appendChild(interimOverlay);
-            
-            // Text measurement utility for precise positioning
+            const remoteCursors = {}; // { id: { cursorEl, selectionEl, start, end, name } }
+            let cursorUpdateThrottle;
+
+            // --- 1. Create a more robust measurement utility ---
             const textMetrics = (function(textarea) {
                 const measurementDiv = document.createElement('div');
                 document.body.appendChild(measurementDiv);
-                
+
                 function syncStyles() {
                     const style = window.getComputedStyle(textarea);
+                    // Sync all critical properties for layout
                     const props = [
                         'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight',
+                        'letterSpacing', 'wordSpacing', 'textIndent', 'textTransform',
+                        'whiteSpace', 'wordWrap', 'wordBreak',
                         'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+                        'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
                         'boxSizing'
                     ];
                     props.forEach(prop => {
                         measurementDiv.style[prop] = style[prop];
                     });
+                    // Set position properties for accurate offset calculation
                     measurementDiv.style.position = 'absolute';
                     measurementDiv.style.top = '-9999px';
                     measurementDiv.style.left = '0px';
-                    measurementDiv.style.width = textarea.clientWidth + 'px';
+                    measurementDiv.style.width = textarea.clientWidth + 'px'; // Use clientWidth to account for padding
                     measurementDiv.style.visibility = 'hidden';
                 }
                 
-                syncStyles();
-                
+                syncStyles(); // Initial sync
+
                 return {
                     getCoords: function(position) {
+                        // Re-sync width in case of resize, less frequent than syncing all styles
                         measurementDiv.style.width = textarea.clientWidth + 'px';
+
                         const text = textarea.value;
                         const before = text.substring(0, position);
-                        
-                        measurementDiv.innerHTML = '';
+                        const after = text.substring(position);
+
+                        measurementDiv.innerHTML = ''; // Clear previous content
+
                         const beforeSpan = document.createElement('span');
                         beforeSpan.textContent = before;
+
                         const targetSpan = document.createElement('span');
-                        targetSpan.textContent = ' ';
+                        targetSpan.textContent = ' '; // A placeholder character to measure
+
+                        const afterSpan = document.createElement('span');
+                        afterSpan.textContent = after;
                         
                         measurementDiv.appendChild(beforeSpan);
                         measurementDiv.appendChild(targetSpan);
+                        measurementDiv.appendChild(afterSpan);
                         
-                        return {
+                        // Calculate coordinates relative to the textarea's content area
+                        const coords = {
                             top: targetSpan.offsetTop,
                             left: targetSpan.offsetLeft,
                             height: targetSpan.offsetHeight
                         };
+                        
+                        return coords;
                     },
-                    sync: syncStyles
+                    sync: syncStyles // Expose sync function to call on resize/font change
                 };
             })(editor);
-            
-            function showInterimAtCursor(text, startPos) {
-                if (!text) {
-                    interimOverlay.textContent = '';
-                    interimOverlay.style.display = 'none';
-                    return;
-                }
-                
-                const coords = textMetrics.getCoords(startPos);
-                interimOverlay.textContent = text;
-                interimOverlay.style.top = (coords.top - editor.scrollTop) + 'px';
-                interimOverlay.style.left = (coords.left - editor.scrollLeft) + 'px';
-                interimOverlay.style.display = 'block';
-            }
 
-            // Initialize speech recognition
-            initializeSpeechRecognition();
 
-            // --- Remote Cursor & Selection Sync Logic (Optimized) ---
-            const remoteCursors = {}; // { id: { cursorEl, selectionEl, start, end, name } }
-            let cursorUpdateThrottle;
-
-            const styles = window.getComputedStyle(editor);
-			// Interim overlay element for collaborator (for future implementation)
-			const collaboratorInterimOverlay = document.createElement('div');
-			collaboratorInterimOverlay.className = 'interim-overlay';
-			remoteCursorsOverlay.appendChild(collaboratorInterimOverlay);
-			
+            // --- 2. Improved rendering logic for cursors and selections ---
             function renderRemoteCursors() {
                 if (!remoteCursorsOverlay) return;
 
                 Object.values(remoteCursors).forEach(data => {
+                    // Render Cursor
                     const startCoords = textMetrics.getCoords(data.start);
                     data.cursorEl.style.top = `${startCoords.top - editor.scrollTop}px`;
                     data.cursorEl.style.left = `${startCoords.left - editor.scrollLeft}px`;
                     data.cursorEl.style.height = `${startCoords.height}px`;
 
+                    // Render Selection
                     if (data.start === data.end) {
                         data.selectionEl.style.display = 'none';
                     } else {
                         data.selectionEl.style.display = 'block';
                         const endCoords = textMetrics.getCoords(data.end);
+                        
+                        // Simple single-line selection logic
                         if (startCoords.top === endCoords.top) {
                             data.selectionEl.style.top = `${startCoords.top - editor.scrollTop}px`;
                             data.selectionEl.style.left = `${startCoords.left - editor.scrollLeft}px`;
                             data.selectionEl.style.width = `${endCoords.left - startCoords.left}px`;
                             data.selectionEl.style.height = `${startCoords.height}px`;
                         } else {
-                            data.selectionEl.style.display = 'none';
+                            // For multi-line selections, a more complex rendering logic is needed.
+                            // This simple version will just cover the start position.
+                            data.selectionEl.style.display = 'none'; // Hide for now to avoid incorrect rendering
                         }
                     }
                 });
             }
 
+            // --- 3. Updated Socket.IO event handlers ---
             function hashCode(str) {
                 let hash = 0;
                 for (let i = 0; i < str.length; i++) {
@@ -1795,11 +2671,13 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                     const color = `hsl(${hashCode(data.id) % 360}, 90%, 60%)`;
                     const name = `User ${data.id.substring(0, 4)}`;
                     
+                    // Create cursor element
                     const cursorEl = document.createElement('div');
                     cursorEl.className = 'remote-cursor';
                     cursorEl.style.backgroundColor = color;
                     cursorEl.setAttribute('data-label', name);
                     
+                    // Create selection element
                     const selectionEl = document.createElement('div');
                     selectionEl.className = 'remote-selection';
                     selectionEl.style.backgroundColor = color;
@@ -1823,6 +2701,7 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 }
             });
 
+            // --- 4. Enhanced event listeners for syncing and rendering ---
             document.addEventListener('selectionchange', () => {
                 if (document.activeElement === editor) {
                     clearTimeout(cursorUpdateThrottle);
@@ -1835,24 +2714,28 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                                 end: editor.selectionEnd
                             });
                         }
-                    }, 50);
+                    }, 50); // Shorten throttle for better responsiveness
                 }
             });
 
+            // Re-render on scroll, resize, and font changes
             editor.addEventListener('scroll', renderRemoteCursors);
             window.addEventListener('resize', () => {
                 textMetrics.sync();
+                syncInterimTailLayout();
                 renderRemoteCursors();
             });
+            // When director settings change, resync styles and render
             [directorFontFamilySelect, directorFontSizeInput, directorLineHeightInput].forEach(el => {
                 el.addEventListener('input', () => {
-                    setTimeout(() => {
+                    setTimeout(() => { // Wait for styles to apply
                         textMetrics.sync();
                         renderRemoteCursors();
                     }, 0);
                 });
             });
 
+            // Re-render when text is updated by collaboration
             const originalStateUpdateHandler = socket._callbacks['$state_update'][0];
             socket.off('state_update');
             socket.on('state_update', (data) => {
@@ -1865,20 +2748,6 @@ body.dark-mode .style-control input[type="color"]::-moz-color-swatch {
                 originalPatchHandler(data);
                 Promise.resolve().then(renderRemoteCursors);
             });
-			
-			socket.on('interim_text', (data) => {
-				if (!data || !data.text) {
-					collaboratorInterimOverlay.textContent = '';
-					collaboratorInterimOverlay.style.display = 'none';
-					return;
-				}
-				const coords = textMetrics.getCoords(data.start || 0);
-				collaboratorInterimOverlay.textContent = data.text;
-				collaboratorInterimOverlay.style.top = (coords.top - editor.scrollTop) + 'px';
-				collaboratorInterimOverlay.style.left = (coords.left - editor.scrollLeft) + 'px';
-				collaboratorInterimOverlay.style.display = 'block';
-			});			
-			
         });
     </script>
 </body>

@@ -18,9 +18,26 @@
       width: 100%;
       max-width: none;
       padding: 40px;
-      font-size: 40px;
+      font-size: 60px;
       line-height: 1.4;
       color: #fff;
+    }
+    .viewer-interim {
+      box-sizing: border-box;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      width: 100%;
+      max-width: none;
+      padding: 0 40px 40px;
+      font-size: 60px;
+      line-height: 1.4;
+      color: #fff;
+      opacity: 0.7;
+      min-height: 1.4em;
+    }
+    .viewer-interim.holding-space {
+      visibility: hidden;
     }
     .scroll-to-bottom-btn {
         position: fixed;
@@ -176,6 +193,7 @@
 <body>
   <div class="viewer-container">
     <div id="viewer-text" class="viewer-text"></div>
+    <div id="viewer-interim" class="viewer-interim" aria-live="polite"></div>
   </div>
 
   <button id="scroll-to-bottom-btn" class="scroll-to-bottom-btn" title="捲動到底部">
@@ -206,11 +224,20 @@
     document.addEventListener('DOMContentLoaded', () => {
       const socket = io({ transports: ["websocket"] });
       const ROOM_ID = "{{ room_id }}";
+      const viewerContainer = document.querySelector('.viewer-container');
       const viewerText = document.getElementById('viewer-text');
+      const viewerInterim = document.getElementById('viewer-interim');
       const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
-      const scrollEl = document.documentElement;
+      const scrollEl = document.scrollingElement || document.documentElement;
       let dmp = new diff_match_patch();
       let currentText = '';
+      let shouldAutoScroll = true;
+      let forceScrollBottom = false;
+      let collaborationMode = 'human_ai';
+      const INTERIM_COLLAPSE_MAX_HOLD_MS = 1800;
+      let interimCollapseTimer = null;
+      let viewerInterimHoldHeightPx = 0;
+      let isHoldingViewerInterimSpace = false;
 
       // --- 新增：FAB & Modal 相關 DOM 元素 ---
       const fabContainer = document.getElementById('fab-container');
@@ -224,16 +251,113 @@
 
       // --- Auto-scroll Logic ---
       function isScrolledToBottom() {
-          const threshold = 5;
-          return scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < threshold;
+          if (isManualTranscriptionMode()) {
+              const threshold = Math.max(120, scrollEl.clientHeight * 0.25);
+              return Math.abs(scrollEl.scrollTop - manualScrollTarget()) <= threshold;
+          }
+          // 嚴格判定：除非使用者主動上滑超過 0.8 頁的高度，否則都會自動置底
+          const threshold = Math.max(150, scrollEl.clientHeight * 0.8);
+          return scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= threshold;
       }
 
+      let isProgrammaticScroll = false;
       function scrollToBottom() {
-          scrollEl.scrollTop = scrollEl.scrollHeight;
+          isProgrammaticScroll = true;
+          scrollEl.scrollTop = isManualTranscriptionMode()
+              ? manualScrollTarget()
+              : scrollEl.scrollHeight;
+          setTimeout(() => { isProgrammaticScroll = false; }, 50);
+      }
+
+      function isManualTranscriptionMode() {
+          return collaborationMode === 'manual_transcription';
+      }
+
+      function setCollaborationMode(settings) {
+          const nextMode = settings?.collaborationMode === 'manual_transcription'
+              ? 'manual_transcription'
+              : 'human_ai';
+          const modeChanged = collaborationMode !== nextMode;
+          collaborationMode = nextMode;
+          if (modeChanged && shouldAutoScroll) {
+              scrollToBottom();
+              setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); }, 50);
+          }
+      }
+
+      // 人工聽打模式的捲動目標：有淡色組字暫存時捲到絕對底部（顯示組字預覽），
+      // 否則對齊最後一行正式文字（避免底部留白）。
+      function manualScrollTarget() {
+          if (String(viewerInterim.textContent || '').trim()) {
+              return Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+          }
+          return getLastTextLineScrollTop();
+      }
+
+      function getLastTextLineScrollTop() {
+          const maxScrollTop = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+          const visibleText = String(currentText || '').trimEnd();
+          if (!visibleText) return 0;
+
+          const textNode = viewerText.firstChild;
+          if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return maxScrollTop;
+
+          const endOffset = Math.min(visibleText.length, textNode.textContent.length);
+          if (endOffset <= 0) return 0;
+
+          const range = document.createRange();
+          try {
+              range.setStart(textNode, Math.max(0, endOffset - 1));
+              range.setEnd(textNode, endOffset);
+              const rect = range.getBoundingClientRect();
+              const bottomInset = Math.min(80, Math.max(24, scrollEl.clientHeight * 0.08));
+              const targetTop = scrollEl.scrollTop + rect.bottom - scrollEl.clientHeight + bottomInset;
+              return Math.max(0, Math.min(maxScrollTop, targetTop));
+          } catch (e) {
+              return maxScrollTop;
+          } finally {
+              if (typeof range.detach === 'function') {
+                  range.detach();
+              }
+          }
+      }
+
+      function enforceScrollBottom() {
+          if (!forceScrollBottom) return;
+          shouldAutoScroll = true;
+          scrollToBottomBtn.classList.remove('visible');
+          scrollToBottom();
+      }
+
+      function setForceScrollBottom(enabled) {
+          forceScrollBottom = Boolean(enabled);
+          if (forceScrollBottom) {
+              enforceScrollBottom();
+              setTimeout(enforceScrollBottom, 50);
+          } else {
+              handleScroll();
+          }
+      }
+
+      async function toggleFullscreen() {
+          try {
+              if (document.fullscreenElement) {
+                  await document.exitFullscreen();
+              } else {
+                  await document.documentElement.requestFullscreen();
+              }
+          } catch (e) {}
       }
 
       function handleScroll() {
-          if (isScrolledToBottom()) {
+          if (isProgrammaticScroll) return;
+          if (forceScrollBottom) {
+              enforceScrollBottom();
+              return;
+          }
+          const atBottom = isScrolledToBottom();
+          shouldAutoScroll = atBottom;
+          if (atBottom) {
               scrollToBottomBtn.classList.remove('visible');
           } else {
               scrollToBottomBtn.classList.add('visible');
@@ -242,22 +366,97 @@
 
       function wrapUpdateFunction(updateFn) {
           return function(...args) {
-              const shouldScroll = isScrolledToBottom();
-              updateFn(...args);
-              if (shouldScroll) {
-                  setTimeout(scrollToBottom, 0);
+              if (isScrolledToBottom()) {
+                  shouldAutoScroll = true;
               }
-              handleScroll();
+              const savedScrollTop = scrollEl.scrollTop;
+              const wasAutoScroll = shouldAutoScroll;
+              
+              updateFn(...args);
+              
+              if (wasAutoScroll) {
+                  scrollToBottom();
+                  setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); handleScroll(); }, 10);
+                  setTimeout(() => { if (shouldAutoScroll) scrollToBottom(); handleScroll(); }, 100);
+                  setTimeout(enforceScrollBottom, 150);
+              } else {
+                  scrollEl.scrollTop = savedScrollTop;
+                  handleScroll();
+              }
           }
       }
 
+      function clearInterimCollapseTimer() {
+          if (!interimCollapseTimer) return;
+          clearTimeout(interimCollapseTimer);
+          interimCollapseTimer = null;
+      }
+
+      function getViewerInterimHeightPx() {
+          return Math.ceil(viewerInterim.getBoundingClientRect().height || 0);
+      }
+
+      function releaseViewerInterimHoldSpace() {
+          clearInterimCollapseTimer();
+          isHoldingViewerInterimSpace = false;
+          viewerInterim.classList.remove('holding-space');
+          viewerInterim.style.minHeight = '1.4em';
+          viewerInterim.textContent = '';
+      }
+
+      function holdViewerInterimSpace() {
+          const measuredHeight = getViewerInterimHeightPx();
+          if (measuredHeight > 0) {
+              viewerInterimHoldHeightPx = measuredHeight;
+          }
+          if (viewerInterimHoldHeightPx <= 0) {
+              releaseViewerInterimHoldSpace();
+              return;
+          }
+          isHoldingViewerInterimSpace = true;
+          viewerInterim.classList.add('holding-space');
+          viewerInterim.style.minHeight = `${viewerInterimHoldHeightPx}px`;
+          viewerInterim.textContent = '\u00A0';
+          clearInterimCollapseTimer();
+          interimCollapseTimer = setTimeout(() => {
+              releaseViewerInterimHoldSpace();
+              if (shouldAutoScroll) scrollToBottom();
+          }, INTERIM_COLLAPSE_MAX_HOLD_MS);
+      }
+
+      function notifyViewerMainTextUpdated() {
+          if (isHoldingViewerInterimSpace) {
+              releaseViewerInterimHoldSpace();
+          }
+      }
+
+      function setViewerInterimText(text) {
+          const next = String(text || '');
+          if (!next.trim()) {
+              const shouldHoldSpace = isHoldingViewerInterimSpace || String(viewerInterim.textContent || '').trim().length > 0;
+              if (shouldHoldSpace) {
+                  holdViewerInterimSpace();
+              } else {
+                  releaseViewerInterimHoldSpace();
+              }
+              return;
+          }
+          clearInterimCollapseTimer();
+          isHoldingViewerInterimSpace = false;
+          viewerInterim.classList.remove('holding-space');
+          viewerInterim.style.minHeight = '1.4em';
+          viewerInterim.textContent = next;
+          viewerInterimHoldHeightPx = getViewerInterimHeightPx();
+      }
+
       const wrappedRender = wrapUpdateFunction((text) => {
-        currentText = text; // 確保 currentText 永遠是最新最完整的文本
+        currentText = text;
         viewerText.textContent = text;
+        notifyViewerMainTextUpdated();
       });
 
       socket.on('connect', () => {
-        socket.emit('join', { room: ROOM_ID });
+        socket.emit('join', { room: ROOM_ID, role: 'viewer' });
       });
 
 		// === 將上面的函式替換為這個正確的版本 ===
@@ -270,6 +469,11 @@
 			if (settings.lineHeight) viewerText.style.lineHeight = settings.lineHeight;
 			if (settings.fontStyle) viewerText.style.fontStyle = settings.fontStyle;
 			if (settings.fontWeight) viewerText.style.fontWeight = settings.fontWeight;
+            if (settings.fontFamily) viewerInterim.style.fontFamily = settings.fontFamily;
+            if (settings.fontSize) viewerInterim.style.fontSize = settings.fontSize;
+            if (settings.lineHeight) viewerInterim.style.lineHeight = settings.lineHeight;
+            if (settings.fontStyle) viewerInterim.style.fontStyle = settings.fontStyle;
+            if (settings.fontWeight) viewerInterim.style.fontWeight = settings.fontWeight;
 
 			// 2. 【核心修改】直接使用從導播端傳來的顏色值
             // 這樣才能響應導播端的任何顏色修改
@@ -278,6 +482,7 @@
             }
             if (settings.color) {
                 viewerText.style.color = settings.color;
+                viewerInterim.style.color = settings.color;
             }
 
 			// 3. 根據主題決定「捲動按鈕」的樣式 (這部分保留)
@@ -286,15 +491,20 @@
 			} else {
               scrollToBottomBtn.classList.add('light-mode-fab');
 			}
+            setForceScrollBottom(settings.forceScrollBottom);
 		}
 
       socket.on('state_update', (state) => {
+        if (state && state.director_settings) {
+          setCollaborationMode(state.director_settings);
+        }
         if (state && state.viewer_settings) {
           applyViewerSettings(state.viewer_settings);
         }
         if (typeof state.raw_text === 'string') {
           wrappedRender(state.raw_text);
         }
+        setViewerInterimText(state?.interim_text || '');
       });
 
       socket.on('viewer_settings_update', (payload) => {
@@ -303,19 +513,10 @@
         }
       });
 
-      // NOTE: interimSpan 在頂層建立，只建立一次，避免 script_patched 每次回呼都重複建立
-      const interimSpan = document.createElement('span');
-      interimSpan.style.color = 'rgba(128,128,128,0.6)';
-      interimSpan.style.fontStyle = 'italic';
-      viewerText.appendChild(interimSpan);
-
-      // NOTE: interim_text 監聽器在頂層只注冊一次
-      socket.on('interim_text', (data) => {
-        if (!data || !data.text) {
-          interimSpan.textContent = '';
-          return;
+      socket.on('director_settings_update', (payload) => {
+        if (payload && payload.settings) {
+          setCollaborationMode(payload.settings);
         }
-        interimSpan.textContent = data.text;
       });
 
       socket.on('script_patched', wrapUpdateFunction((data) => {
@@ -323,16 +524,26 @@
           const patches = dmp.patch_fromText(data.patch || '');
           const [newText, results] = dmp.patch_apply(patches, currentText);
           if (results.some(r => !r)) {
-            socket.emit('join', { room: ROOM_ID });
+            socket.emit('join', { room: ROOM_ID, role: 'viewer' });
             return;
           }
           wrappedRender(newText);
-          // NOTE: 落地後清除 interim overlay（文字已寫入正文）
-          interimSpan.textContent = '';
         } catch(e) {
-          socket.emit('join', { room: ROOM_ID });
+          socket.emit('join', { room: ROOM_ID, role: 'viewer' });
         }
       }));
+
+      socket.on('interim_update', wrapUpdateFunction((payload) => {
+          setViewerInterimText(payload?.text || '');
+      }));
+
+      // 定期偵測並強制滾動置底，確保不會因為偶發的 DOM 渲染延遲而卡住
+      setInterval(() => {
+          if (shouldAutoScroll) {
+              scrollToBottom();
+          }
+      }, 1500);
+      setInterval(enforceScrollBottom, 500);
 
       // --- 新增：FAB & Modal Logic ---
 
@@ -389,7 +600,33 @@
 
       // Event Listeners
       window.addEventListener('scroll', handleScroll);
-      scrollToBottomBtn.addEventListener('click', scrollToBottom);
+      window.addEventListener('wheel', (event) => {
+          if (!forceScrollBottom) return;
+          event.preventDefault();
+          enforceScrollBottom();
+      }, { passive: false });
+      window.addEventListener('touchmove', (event) => {
+          if (!forceScrollBottom) return;
+          event.preventDefault();
+          enforceScrollBottom();
+      }, { passive: false });
+      window.addEventListener('keydown', (event) => {
+          if (!forceScrollBottom) return;
+          const scrollKeys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
+          if (scrollKeys.has(event.key)) {
+              event.preventDefault();
+              enforceScrollBottom();
+          }
+      });
+      scrollToBottomBtn.addEventListener('click', () => {
+          shouldAutoScroll = true;
+          scrollToBottom();
+          handleScroll();
+      });
+      viewerContainer.addEventListener('dblclick', (e) => {
+          if (e.button !== 0) return;
+          toggleFullscreen();
+      });
     });
   </script>
 </body>

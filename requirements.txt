@@ -1,5 +1,24 @@
-flask
-flask-socketio
-diff-match-patch
-gunicorn
-eventlet
+# 釘選為線上 v39 實際運作的完整版本組合（2026-06-02 由 v39 容器 pip freeze 取得）。
+# 原因：未鎖版本時，重建會裝到不相容的 eventlet/gunicorn，導致
+# gunicorn 找不到 eventlet worker（Entry point ('gunicorn.workers','eventlet') not found）而 crash。
+# 直接依賴：flask / flask-socketio / diff-match-patch / gunicorn / eventlet；其餘為其相依套件，一併釘版以確保可重現。
+bidict==0.23.1
+blinker==1.9.0
+click==8.4.1
+diff-match-patch==20241021
+dnspython==2.8.0
+eventlet==0.41.0
+Flask==3.1.3
+Flask-SocketIO==5.6.1
+greenlet==3.5.1
+gunicorn==25.3.0
+h11==0.16.0
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+packaging==26.2
+python-engineio==4.13.2
+python-socketio==5.16.2
+simple-websocket==1.1.0
+Werkzeug==3.1.8
+wsproto==1.3.2
